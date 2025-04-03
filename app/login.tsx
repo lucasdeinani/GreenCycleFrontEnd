@@ -5,7 +5,7 @@ import { Eye, EyeOff, Leaf, X } from 'lucide-react-native';
 import axios from 'axios';
 
 // URL base da API
-const API_BASE_URL = 'http://127.0.0.1:8000/v1';
+const API_BASE_URL = 'http://10.0.0.160:8000/v1';
 
 export default function LoginScreen() {
     const [userType, setUserType] = useState<'user' | 'partner'>('user');
@@ -28,8 +28,9 @@ export default function LoginScreen() {
         try {
             const endpoint = userType === 'user' ? 'clientes' : 'parceiros';
 
-
+            console.log('Dados recebidos da API:', response.data);
             const response = await axios.get(`${API_BASE_URL}/${endpoint}`);
+            
 
             const users = response.data;
             const user = users.find(u => u.username === username);
@@ -49,6 +50,7 @@ export default function LoginScreen() {
             }
         } catch (error) {
             console.error('Erro ao fazer login:', error);
+            console.log('Erro ao criar cadastro:', error);
             Alert.alert('Erro', 'Não foi possível fazer login. Verifique sua conexão.');
         } finally {
             setIsLoading(false);

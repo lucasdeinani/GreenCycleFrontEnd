@@ -24,7 +24,7 @@ const MATERIAL_OPTIONS = [
 ];
 
 // URL base da API
-const API_BASE_URL = 'http://127.0.0.1:8000/v1';
+const API_BASE_URL = 'http://10.0.0.160:8000/v1';
 
 export default function RegisterScreen() {
     const [userType, setUserType] = useState<'client' | 'partner'>('client');
@@ -115,61 +115,48 @@ export default function RegisterScreen() {
             setIsLoading(true);
 
             try {
-                const endpoint = userType === 'client' ? 'clientes' : 'parceiros';
-                const documentField = userType === 'client' ? 'cpf' : 'cnpj';
-
-                const apiData = {
+                // 1. Criar usuário
+                const userResponse = await axios.post(`${API_BASE_URL}/usuarios/`, {
                     nome: formData.fullName,
                     email: formData.email,
                     senha: formData.password,
+                    id_endereco: null
+                });
+
+                const userId = userResponse.data.id;
+
+                // 2. Criar cliente ou parceiro usando o ID do usuário recém-criado
+                const endpoint = userType === 'client' ? 'clientes' : 'parceiros';
+                const documentField = userType === 'client' ? 'cpf' : 'cnpj';
+
+                const userTypeResponse = await axios.post(`${API_BASE_URL}/${endpoint}/`, {
                     [documentField]: formData.document,
-                    id_endereco: null,
-                };
+                    id_usuarios: userId
+                });
 
-                const response = await axios.post(`${API_BASE_URL}/${endpoint}/`, apiData);
+                Alert.alert(
+                    'Sucesso',
+                    'Cadastro realizado com sucesso!',
+                    [{ text: 'OK', onPress: () => router.replace('/login') }]
+                );
 
-                if (response.status >= 200 && response.status < 300) {
-                    Alert.alert(
-                        'Sucesso',
-                        'Cadastro realizado com sucesso!',
-                        [{ text: 'OK', onPress: () => router.replace('/login') }]
-                    );
-                } else {
-                    Alert.alert('Erro', 'Não foi possível realizar o cadastro.');
-                }
             } catch (error: any) {
                 console.error('Erro ao criar cadastro:', error);
 
                 let errorMessage = 'Não foi possível realizar o cadastro. Tente novamente.';
-
-                if (error.response) {
-                    if (error.response.status === 400) {
-                        errorMessage = 'Dados inválidos. Verifique as informações e tente novamente.';
-
- 
-                        if (error.response.data) {
-                            console.log(error.response.data);
-                            const errorDetails = Object.entries(error.response.data)
-                                .map(([key, value]) => `${key}: ${value}`)
-                                .join('\n');
-
-                            if (errorDetails) {
-                                errorMessage += `\n\n${errorDetails}`;
-                            }
-                        }
-                    } else if (error.response.status === 500) {
-                        errorMessage = 'Erro no servidor. Tente novamente mais tarde.';
-                    }
-                } else if (error.request) {
-                    errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
+                if (error.response?.status === 400 && error.response.data) {
+                    const errorDetails = Object.entries(error.response.data)
+                        .map(([key, value]) => `${key}: ${value}`)
+                        .join('\n');
+                    errorMessage += `\n\n${errorDetails}`;
                 }
-
                 Alert.alert('Erro', errorMessage);
             } finally {
                 setIsLoading(false);
             }
         }
     };
+
 
     const handleUserTypeChange = (type: 'client' | 'partner') => {
         setUserType(type);
@@ -189,6 +176,7 @@ export default function RegisterScreen() {
                 <Text style={styles.backButtonText}>Retorne ao Login</Text>
             </TouchableOpacity>
 
+            
             <View style={styles.header}>
                 <Leaf size={40} color="#4CAF50" />
                 <Text style={styles.title}>Crie sua conta</Text>
@@ -407,6 +395,18 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#F5F5F5',
+        padding: 16,
+    },
+    logoContainer: {
+        alignItems: 'center',
+        marginTop: 40,
+        marginBottom: 24,
+    },
+    title: {
+        fontSize: 24,
+        fontFamily: 'Roboto-Bold',
+        color: '#4CAF50',
+        marginTop: 8,
     },
     backButton: {
         flexDirection: 'row',
@@ -421,18 +421,149 @@ const styles = StyleSheet.create({
     },
     header: {
         alignItems: 'center',
-        marginVertical: 20,
-    },
-    title: {
-        fontSize: 24,
-        fontFamily: 'Roboto-Bold',
-        color: '#333333',
-        marginTop: 8,
+        marginBottom: 20,
     },
     toggleContainer: {
         flexDirection: 'row',
         backgroundColor: '#E0E0E0',
         borderRadius: 8,
-        margin: 16,
-    }
+        marginBottom: 24,
+    },
+    toggleButton: {
+        flex: 1,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    toggleButtonActive: {
+        backgroundColor: '#FFC107',
+    },
+    toggleText: {
+        fontFamily: 'Roboto-Medium',
+        fontSize: 16,
+        color: '#666',
+    },
+    toggleTextActive: {
+        color: '#333333',
+    },
+    form: {
+        marginBottom: 16,
+    },
+    inputGroup: {
+        marginBottom: 16,
+    },
+    label: {
+        fontFamily: 'Roboto-Medium',
+        fontSize: 16,
+        color: '#333333',
+        marginBottom: 8,
+    },
+    input: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        fontFamily: 'Roboto-Regular',
+        color: '#333333',
+    },
+    inputError: {
+        borderColor: '#FF5252',
+        borderWidth: 1,
+    },
+    genderContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    genderButton: {
+        flex: 1,
+        padding: 12,
+        marginHorizontal: 4,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    genderButtonActive: {
+        backgroundColor: '#4CAF50',
+    },
+    genderButtonText: {
+        color: '#333333',
+        fontFamily: 'Roboto-Regular',
+    },
+    genderButtonTextActive: {
+        color: '#FFFFFF',
+        fontFamily: 'Roboto-Medium',
+    },
+    materialContainer: {
+        flexDirection: 'column',
+        gap: 8,
+    },
+    materialButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 8,
+    },
+    materialButtonActive: {
+        backgroundColor: '#4CAF50',
+    },
+    materialButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    checkbox: {
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: '#999',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 8,
+    },
+    checkboxActive: {
+        backgroundColor: '#FFFFFF20',
+        borderColor: '#FFFFFF',
+    },
+    materialButtonText: {
+        fontFamily: 'Roboto-Regular',
+        color: '#333',
+    },
+    materialButtonTextActive: {
+        color: '#FFFFFF',
+        fontFamily: 'Roboto-Medium',
+    },
+    dateText: {
+        fontSize: 16,
+        fontFamily: 'Roboto-Regular',
+        color: '#333333',
+    },
+    errorText: {
+        color: '#FF5252',
+        fontSize: 14,
+        fontFamily: 'Roboto-Regular',
+        marginTop: 4,
+    },
+    registerButton: {
+        backgroundColor: '#2196F3',
+        borderRadius: 8,
+        padding: 16,
+        alignItems: 'center',
+        marginVertical: 16,
+    },
+    registerButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontFamily: 'Roboto-Medium',
+    },
+    loadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    buttonDisabled: {
+        backgroundColor: '#9E9E9E',
+        opacity: 0.7,
+    },
 });

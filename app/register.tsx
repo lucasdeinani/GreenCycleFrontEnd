@@ -24,7 +24,7 @@ const MATERIAL_OPTIONS = [
 ];
 
 // URL base da API
-const API_BASE_URL = 'http://127.0.0.1:8000/v1';
+const API_BASE_URL = 'http://10.0.0.160:8000/v1';
 
 export default function RegisterScreen() {
     const [userType, setUserType] = useState<'client' | 'partner'>('client');
@@ -115,61 +115,48 @@ export default function RegisterScreen() {
             setIsLoading(true);
 
             try {
-                const endpoint = userType === 'client' ? 'clientes' : 'parceiros';
-                const documentField = userType === 'client' ? 'cpf' : 'cnpj';
-
-                const apiData = {
+                // 1. Criar usuário
+                const userResponse = await axios.post(`${API_BASE_URL}/usuarios/`, {
                     nome: formData.fullName,
                     email: formData.email,
                     senha: formData.password,
+                    id_endereco: null
+                });
+
+                const userId = userResponse.data.id;
+
+                // 2. Criar cliente ou parceiro usando o ID do usuário recém-criado
+                const endpoint = userType === 'client' ? 'clientes' : 'parceiros';
+                const documentField = userType === 'client' ? 'cpf' : 'cnpj';
+
+                const userTypeResponse = await axios.post(`${API_BASE_URL}/${endpoint}/`, {
                     [documentField]: formData.document,
-                    id_endereco: null,
-                };
+                    id_usuarios: userId
+                });
 
-                const response = await axios.post(`${API_BASE_URL}/${endpoint}/`, apiData);
+                Alert.alert(
+                    'Sucesso',
+                    'Cadastro realizado com sucesso!',
+                    [{ text: 'OK', onPress: () => router.replace('/login') }]
+                );
 
-                if (response.status >= 200 && response.status < 300) {
-                    Alert.alert(
-                        'Sucesso',
-                        'Cadastro realizado com sucesso!',
-                        [{ text: 'OK', onPress: () => router.replace('/login') }]
-                    );
-                } else {
-                    Alert.alert('Erro', 'Não foi possível realizar o cadastro.');
-                }
             } catch (error: any) {
                 console.error('Erro ao criar cadastro:', error);
 
                 let errorMessage = 'Não foi possível realizar o cadastro. Tente novamente.';
-
-                if (error.response) {
-                    if (error.response.status === 400) {
-                        errorMessage = 'Dados inválidos. Verifique as informações e tente novamente.';
-
- 
-                        if (error.response.data) {
-                            console.log(error.response.data);
-                            const errorDetails = Object.entries(error.response.data)
-                                .map(([key, value]) => `${key}: ${value}`)
-                                .join('\n');
-
-                            if (errorDetails) {
-                                errorMessage += `\n\n${errorDetails}`;
-                            }
-                        }
-                    } else if (error.response.status === 500) {
-                        errorMessage = 'Erro no servidor. Tente novamente mais tarde.';
-                    }
-                } else if (error.request) {
-                    errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
+                if (error.response?.status === 400 && error.response.data) {
+                    const errorDetails = Object.entries(error.response.data)
+                        .map(([key, value]) => `${key}: ${value}`)
+                        .join('\n');
+                    errorMessage += `\n\n${errorDetails}`;
                 }
-
                 Alert.alert('Erro', errorMessage);
             } finally {
                 setIsLoading(false);
             }
         }
     };
+
 
     const handleUserTypeChange = (type: 'client' | 'partner') => {
         setUserType(type);

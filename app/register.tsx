@@ -421,5 +421,133 @@ const styles = StyleSheet.create({
         backgroundColor: '#E0E0E0',
         borderRadius: 8,
         margin: 16,
-    }
-});
+    },
+    toggleButton: {
+        flex: 1,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    toggleButtonActive: {
+        backgroundColor: '#FFC107',
+    },
+    toggleText: {
+        fontFamily: 'Roboto-Medium',
+        fontSize: 16,
+        color: '#666666',
+    },
+    toggleTextActive: {
+        color: '#333333',
+    },
+    form: {
+        padding: 16,
+        gap: 16,
+    },
+    inputGroup: {
+        gap: 8,
+    },
+    label: {
+        fontSize: 14,
+        fontFamily: 'Roboto-Medium',
+        color: '#666666',
+    },
+    input: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        fontFamily: 'Roboto-Regular',
+        color: '#333333',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    inputError: {
+        borderColor: '#FF5252',
+    },
+    errorText: {
+        color: '#FF5252',
+        fontSize: 12,
+        fontFamily: 'Roboto-Regular',
+    },
+    genderContainer: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    genderButton: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    genderButtonActive: {
+        backgroundColor: '#4CAF50',
+        borderColor: '#4CAF50',
+    },
+    genderButtonText: {
+        color: '#666666',
+        fontSize: 14,
+        fontFamily: 'Roboto-Medium',
+    },
+    genderButtonTextActive: {
+        color: '#FFFFFF',
+    },
+    materialContainer: {
+         gap: 8,
+    },
+    materialButton: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    materialButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    materialButtonActive: {
+        borderColor: '#4CAF50',
+    },
+    checkbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 4,
+        borderWidth: 2,
+        borderColor: '#E0E0E0',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    checkboxActive: {
+        backgroundColor: '#4CAF50',
+        borderColor: '#4CAF50',
+    },
+    materialButtonText: {
+        color: '#666666',
+        fontSize: 14,
+        fontFamily: 'Roboto-Medium',
+    },
+    materialButtonTextActive: {
+        color: '#333333',
+    },
+    dateText: {
+        fontSize: 16,
+        fontFamily: 'Roboto-Regular',
+        color: '#333333',
+    },
+    registerButton: {
+        backgroundColor: '#4CAF50',
+        borderRadius: 8,
+        padding: 16,
+        alignItems: 'center',
+        marginTop: 24,
+    },
+    registerButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontFamily: 'Roboto-Medium',
+    },
+  });

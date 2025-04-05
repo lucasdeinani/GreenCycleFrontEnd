@@ -27,16 +27,13 @@ export default function LoginScreen() {
 
         try {
             const endpoint = userType === 'user' ? 'clientes' : 'parceiros';
-
-            console.log('Dados recebidos da API:', response.data);
             const response = await axios.get(`${API_BASE_URL}/${endpoint}`);
-            
-
             const users = response.data;
-            const user = users.find(u => u.username === username);
+            console.log("Username digitado:", username);
+            const user = users.find(u => u.id_usuarios?.usuario === username);
 
             if (user) {
-                if (user.senha === password) {
+                if (user.id_usuarios.senha === password) {
                     if (userType === 'user') {
                         router.replace('/(app)/menu');
                     } else {

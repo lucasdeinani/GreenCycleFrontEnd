@@ -116,23 +116,36 @@ export default function RegisterScreen() {
 
             try {
                 // 1. Criar usuário
-                const userResponse = await axios.post(`${API_BASE_URL}/usuarios/`, {
+                const userPayload = {
                     nome: formData.fullName,
-                    email: formData.email,
+                    usuario: formData.username.trim(),
+                    email: formData.email.trim(),
                     senha: formData.password,
                     id_endereco: null
-                });
+                };
 
+                console.log('Enviando usuário:', userPayload);
+
+                const userResponse = await axios.post(`${API_BASE_URL}/usuarios/`, userPayload);
                 const userId = userResponse.data.id;
 
-                // 2. Criar cliente ou parceiro usando o ID do usuário recém-criado
+                // 2. Criar cliente ou parceiro
                 const endpoint = userType === 'client' ? 'clientes' : 'parceiros';
                 const documentField = userType === 'client' ? 'cpf' : 'cnpj';
 
-                const userTypeResponse = await axios.post(`${API_BASE_URL}/${endpoint}/`, {
+                const userTypePayload: any = {
                     [documentField]: formData.document,
                     id_usuarios: userId
-                });
+                };
+
+                if (userType === 'client') {
+                    userTypePayload.data_nascimento = formData.birthday.toISOString().split('T')[0];
+                    userTypePayload.sexo = formData.gender[0];
+                }
+
+                console.log(`Enviando para /${endpoint}/:`, userTypePayload);
+
+                const userTypeResponse = await axios.post(`${API_BASE_URL}/${endpoint}/`, userTypePayload);
 
                 Alert.alert(
                     'Sucesso',
@@ -156,6 +169,7 @@ export default function RegisterScreen() {
             }
         }
     };
+
 
 
     const handleUserTypeChange = (type: 'client' | 'partner') => {
@@ -627,61 +641,6 @@ const styles = StyleSheet.create({
         padding: 16,
         alignItems: 'center',
         marginTop: 24,
-    },
-    registerButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontFamily: 'Roboto-Medium',
-    },
-  });
-    },
-    materialButtonActive: {
-        backgroundColor: '#4CAF50',
-    },
-    materialButtonContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    checkbox: {
-        width: 20,
-        height: 20,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: '#999',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 8,
-    },
-    checkboxActive: {
-        backgroundColor: '#FFFFFF20',
-        borderColor: '#FFFFFF',
-    },
-    materialButtonText: {
-        fontFamily: 'Roboto-Regular',
-        color: '#333',
-    },
-    materialButtonTextActive: {
-        color: '#FFFFFF',
-        fontFamily: 'Roboto-Medium',
-    },
-    dateText: {
-        fontSize: 16,
-        fontFamily: 'Roboto-Regular',
-        color: '#333333',
-    },
-    errorText: {
-        color: '#FF5252',
-        fontSize: 14,
-        fontFamily: 'Roboto-Regular',
-        marginTop: 4,
-    },
-    registerButton: {
-        backgroundColor: '#2196F3',
-        borderRadius: 8,
-        padding: 16,
-        alignItems: 'center',
-        marginVertical: 16,
     },
     registerButtonText: {
         color: '#FFFFFF',

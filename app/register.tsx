@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { ArrowLeft, Leaf, Check } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
+import { Eye, EyeOff } from 'lucide-react-native';
 
 const MATERIAL_OPTIONS = [
     'Metais',
@@ -24,7 +25,7 @@ const MATERIAL_OPTIONS = [
 ];
 
 // URL base da API
-const API_BASE_URL = 'http://10.0.0.160:8000/v1';
+const API_BASE_URL = 'http://192.168.0.86:8000/v1';
 
 export default function RegisterScreen() {
     const [userType, setUserType] = useState<'client' | 'partner'>('client');
@@ -43,6 +44,9 @@ export default function RegisterScreen() {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [errors, setErrors] = useState<Record<string, string | null>>({});
     const [isLoading, setIsLoading] = useState(false);
+
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const handleChange = (field: string, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -110,52 +114,91 @@ export default function RegisterScreen() {
         return Object.keys(newErrors).length === 0;
     };
 
+    // Formatação do CPF
+    const formatCPF = (value: string) => {
+        const cleaned = value.replace(/\D/g, '');
+        const match = cleaned.match(/^(\d{0,3})(\d{0,3})(\d{0,3})(\d{0,2})$/);
+        if (!match) return value;
+        
+        return [match[1], match[2], match[3], match[4]]
+            .filter(group => group)
+            .join('.')
+            .replace(/\.(\d{2})$/, '-$1');
+    };
+
+    // Formatação do CNPJ
+    const formatCNPJ = (value: string) => {
+        const cleaned = value.replace(/\D/g, '');
+        const match = cleaned.match(/^(\d{0,2})(\d{0,3})(\d{0,3})(\d{0,4})(\d{0,2})$/);
+        if (!match) return value;
+        
+        return [match[1], match[2], match[3], match[4], match[5]]
+            .filter(group => group)
+            .join('.')
+            .replace(/\.(\d{4})\.(\d{2})$/, '/$1-$2');
+    };
+    
+    // Escolhe a formatação com base na opção selecionada
+    const handleDocumentChange = (value: string) => {
+        const formattedValue = userType === 'client' 
+            ? formatCPF(value) 
+            : formatCNPJ(value);
+        
+        handleChange('document', formattedValue);
+    };
+
     const handleSubmit = async () => {
         if (validateForm()) {
             setIsLoading(true);
-
+            
+            // Cria cliente já com a relação ao usuário
+            // Cria parceiro já com a relação ao usuário e materiais_parceiros
             try {
-                // 1. Criar usuário
-                const userPayload = {
-                    nome: formData.fullName,
-                    usuario: formData.username.trim(),
-                    email: formData.email.trim(),
-                    senha: formData.password,
-                    id_endereco: null
-                };
-
-                console.log('Enviando usuário:', userPayload);
-
-                const userResponse = await axios.post(`${API_BASE_URL}/usuarios/`, userPayload);
-                const userId = userResponse.data.id;
-
-                // 2. Criar cliente ou parceiro
+                // Preparar payload baseado no tipo de usuário
+                let payload: any;
                 const endpoint = userType === 'client' ? 'clientes' : 'parceiros';
-                const documentField = userType === 'client' ? 'cpf' : 'cnpj';
-
-                const userTypePayload: any = {
-                    [documentField]: formData.document,
-                    id_usuarios: userId
-                };
-
+    
                 if (userType === 'client') {
-                    userTypePayload.data_nascimento = formData.birthday.toISOString().split('T')[0];
-                    userTypePayload.sexo = formData.gender[0];
+                    // Payload para cliente
+                    payload = {
+                        usuario: formData.username.trim(),
+                        cpf: formData.document,
+                        data_nascimento: formData.birthday.toISOString().split('T')[0],
+                        sexo: formData.gender[0], // Pega apenas a primeira letra (M/F/O)
+                        nome: formData.fullName,
+                        email: formData.email.trim(),
+                        senha: formData.password,
+                        id_endereco: null
+                    };
+                } else {
+                    // Payload para parceiro
+                    payload = {
+                        usuario: formData.username.trim(),
+                        cnpj: formData.document,
+                        nome: formData.fullName,
+                        email: formData.email.trim(),
+                        senha: formData.password,
+                        id_endereco: null,
+                        materiais: formData.collectionMaterials.map(material => 
+                            MATERIAL_OPTIONS.indexOf(material) + 1 // Converte para IDs dos materiais
+                        )
+                    };
                 }
-
-                console.log(`Enviando para /${endpoint}/:`, userTypePayload);
-
-                const userTypeResponse = await axios.post(`${API_BASE_URL}/${endpoint}/`, userTypePayload);
-
+    
+                console.log(`Enviando para /${endpoint}/:`, payload);
+    
+                // Fazer a chamada única para o endpoint correto
+                await axios.post(`${API_BASE_URL}/${endpoint}/`, payload);
+    
                 Alert.alert(
                     'Sucesso',
                     'Cadastro realizado com sucesso!',
                     [{ text: 'OK', onPress: () => router.replace('/login') }]
                 );
-
+    
             } catch (error: any) {
                 console.error('Erro ao criar cadastro:', error);
-
+    
                 let errorMessage = 'Não foi possível realizar o cadastro. Tente novamente.';
                 if (error.response?.status === 400 && error.response.data) {
                     const errorDetails = Object.entries(error.response.data)
@@ -173,10 +216,28 @@ export default function RegisterScreen() {
 
 
     const handleUserTypeChange = (type: 'client' | 'partner') => {
+        // Limpa todos os campos do formulário
+        setFormData({
+            fullName: '',
+            email: '',
+            document: '',
+            gender: '',
+            birthday: new Date(),
+            username: '',
+            password: '',
+            confirmPassword: '',
+            collectionMaterials: [],
+        });
+
+        // Reseta os olhinhos para estado oculto
+        setShowPassword(false);
+        setShowConfirmPassword(false);
+        
+        // Limpa todos os erros
+        setErrors({});
+        
+        // Atualiza o tipo de usuário
         setUserType(type);
-        if (type === 'client') {
-            setFormData(prev => ({ ...prev, collectionMaterials: [] }));
-        }
     };
 
     return (
@@ -251,7 +312,7 @@ export default function RegisterScreen() {
                         placeholder={`Escreva seu ${userType === 'client' ? 'CPF' : 'CNPJ'}`}
                         keyboardType="numeric"
                         value={formData.document}
-                        onChangeText={(value) => handleChange('document', value)}
+                        onChangeText={handleDocumentChange}
                         maxLength={userType === 'client' ? 14 : 18}
                         editable={!isLoading}
                     />
@@ -362,27 +423,53 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>Senha</Text>
-                    <TextInput
-                        style={[styles.input, errors.password && styles.inputError]}
-                        placeholder="Digite sua senha"
-                        secureTextEntry
-                        value={formData.password}
-                        onChangeText={(value) => handleChange('password', value)}
-                        editable={!isLoading}
-                    />
+                    <View style={styles.passwordContainer}>
+                        <TextInput
+                            style={[styles.passwordInput, errors.password && styles.inputError]}
+                            placeholder="Digite sua senha"
+                            secureTextEntry={!showPassword}
+                            value={formData.password}
+                            onChangeText={(value) => handleChange('password', value)}
+                            editable={!isLoading}
+                        />
+                        <TouchableOpacity 
+                            style={styles.eyeButton}
+                            onPress={() => setShowPassword(!showPassword)}
+                            disabled={isLoading}
+                        >
+                            {showPassword ? (
+                                <EyeOff size={20} color="#666" />
+                            ) : (
+                                <Eye size={20} color="#666" />
+                            )}
+                        </TouchableOpacity>
+                    </View>
                     {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
                 </View>
 
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>Confirme a Senha</Text>
-                    <TextInput
-                        style={[styles.input, errors.confirmPassword && styles.inputError]}
-                        placeholder="Confirme sua senha"
-                        secureTextEntry
-                        value={formData.confirmPassword}
-                        onChangeText={(value) => handleChange('confirmPassword', value)}
-                        editable={!isLoading}
-                    />
+                    <View style={styles.passwordContainer}>
+                        <TextInput
+                            style={[styles.passwordInput, errors.confirmPassword && styles.inputError]}
+                            placeholder="Confirme sua senha"
+                            secureTextEntry={!showConfirmPassword}
+                            value={formData.confirmPassword}
+                            onChangeText={(value) => handleChange('confirmPassword', value)}
+                            editable={!isLoading}
+                        />
+                        <TouchableOpacity 
+                            style={styles.eyeButton}
+                            onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                            disabled={isLoading}
+                        >
+                            {showConfirmPassword ? (
+                                <EyeOff size={20} color="#666" />
+                            ) : (
+                                <Eye size={20} color="#666" />
+                            )}
+                        </TouchableOpacity>
+                    </View>
                     {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
                 </View>
 
@@ -655,5 +742,23 @@ const styles = StyleSheet.create({
     buttonDisabled: {
         backgroundColor: '#9E9E9E',
         opacity: 0.7,
+    },
+    passwordContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    passwordInput: {
+        flex: 1,
+        padding: 12,
+        fontSize: 16,
+        fontFamily: 'Roboto-Regular',
+        color: '#333333',
+    },
+    eyeButton: {
+        padding: 12,
     },
 });

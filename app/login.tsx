@@ -5,7 +5,7 @@ import { Eye, EyeOff, Leaf, X } from 'lucide-react-native';
 import axios from 'axios';
 
 // URL base da API
-const API_BASE_URL = 'http://10.0.0.160:8000/v1';
+const API_BASE_URL = 'http://192.168.0.86:8000/v1';
 
 export default function LoginScreen() {
     const [userType, setUserType] = useState<'user' | 'partner'>('user');
@@ -22,32 +22,52 @@ export default function LoginScreen() {
             Alert.alert('Erro', 'Por favor, preencha todos os campos');
             return;
         }
-
+    
         setIsLoading(true);
-
+    
         try {
-            const endpoint = userType === 'user' ? 'clientes' : 'parceiros';
-            const response = await axios.get(`${API_BASE_URL}/${endpoint}`);
-            const users = response.data;
-            console.log("Username digitado:", username);
-            const user = users.find(u => u.id_usuarios?.usuario === username);
+            // 1. Primeiro verifica se o usuário existe na tabela usuarios
+            const usersResponse = await axios.get(`${API_BASE_URL}/usuarios`);
+            const user = usersResponse.data.find((u: any) => u.usuario === username);
 
-            if (user) {
-                if (user.id_usuarios.senha === password) {
-                    if (userType === 'user') {
-                        router.replace('/(app)/menu');
-                    } else {
-                        router.replace('/(app)/menu_parceiro');
-                    }
+            console.log('Usuario recebida do frontend:',  `"${username}"`, 'Tipo:', typeof username);
+            console.log('Senha recebida do frontend:',  `"${password}"`, 'Tipo:', typeof password);
+            console.log('Usuario armazenada no banco:', `"${user.usuario}"`, 'Tipo:', typeof user.usuario);
+            console.log('Senha armazenada no banco:', `"${user.senha}"`, 'Tipo:', typeof user.senha);
+    
+            if (!user) {
+                Alert.alert('Erro', 'Usuário não encontrado');
+                return;
+            }
+    
+            // 2. Verifica a senha
+            if (user.senha !== password) {
+                Alert.alert('Erro', 'Senha incorreta');
+                return;
+            }
+    
+            // 3. Verifica se é cliente ou parceiro
+            if (userType === 'user') {
+                const clienteResponse = await axios.get(`${API_BASE_URL}/clientes`);
+                const cliente = clienteResponse.data.find((c: any) => c.id_usuarios === user.id);
+                
+                if (cliente) {
+                    router.replace('/(app)/menu');
                 } else {
-                    Alert.alert('Erro', 'Senha incorreta');
+                    Alert.alert('Erro', 'Cliente não encontrado');
                 }
             } else {
-                Alert.alert('Erro', 'Usuário não encontrado');
+                const parceiroResponse = await axios.get(`${API_BASE_URL}/parceiros`);
+                const parceiro = parceiroResponse.data.find((p: any) => p.id_usuarios === user.id);
+                
+                if (parceiro) {
+                    router.replace('/(app)/menu_parceiro');
+                } else {
+                    Alert.alert('Erro', 'Parceiro não encontrado');
+                }
             }
         } catch (error) {
             console.error('Erro ao fazer login:', error);
-            console.log('Erro ao criar cadastro:', error);
             Alert.alert('Erro', 'Não foi possível fazer login. Verifique sua conexão.');
         } finally {
             setIsLoading(false);

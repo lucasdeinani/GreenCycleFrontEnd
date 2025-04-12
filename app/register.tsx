@@ -542,15 +542,18 @@ const styles = StyleSheet.create({
     toggleText: {
         fontFamily: 'Roboto-Medium',
         fontSize: 16,
-        color: '#666',
+        color: '#666666',
     },
     toggleTextActive: {
         color: '#333333',
     },
     form: {
+        padding: 16,
+        gap: 16,
         marginBottom: 16,
     },
     inputGroup: {
+        gap: 8,
         marginBottom: 16,
     },
     label: {
@@ -566,6 +569,8 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'Roboto-Regular',
         color: '#333333',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
     },
     inputError: {
         borderColor: '#FF5252',
@@ -573,18 +578,22 @@ const styles = StyleSheet.create({
     },
     genderContainer: {
         flexDirection: 'row',
+        gap: 12,
         justifyContent: 'space-between',
     },
     genderButton: {
         flex: 1,
         padding: 12,
         marginHorizontal: 4,
-        backgroundColor: '#E0E0E0',
+        backgroundColor: '#FFFFFF',
+        borderColor: '#E0E0E0',
         borderRadius: 8,
+        borderWidth: 1,
         alignItems: 'center',
     },
     genderButtonActive: {
         backgroundColor: '#4CAF50',
+        borderColor: '#4CAF50',
     },
     genderButtonText: {
         color: '#333333',
@@ -601,92 +610,17 @@ const styles = StyleSheet.create({
     materialButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
-        backgroundColor: '#E0E0E0',
-        borderRadius: 8,
-        margin: 16,
-    },
-    toggleButton: {
-        flex: 1,
-        paddingVertical: 12,
-        alignItems: 'center',
-        borderRadius: 8,
-    },
-    toggleButtonActive: {
-        backgroundColor: '#FFC107',
-    },
-    toggleText: {
-        fontFamily: 'Roboto-Medium',
-        fontSize: 16,
-        color: '#666666',
-    },
-    toggleTextActive: {
-        color: '#333333',
-    },
-    form: {
-        padding: 16,
-        gap: 16,
-    },
-    inputGroup: {
-        gap: 8,
-    },
-    label: {
-        fontSize: 14,
-        fontFamily: 'Roboto-Medium',
-        color: '#666666',
-    },
-    input: {
         backgroundColor: '#FFFFFF',
         borderRadius: 8,
         padding: 12,
-        fontSize: 16,
-        fontFamily: 'Roboto-Regular',
-        color: '#333333',
         borderWidth: 1,
         borderColor: '#E0E0E0',
-    },
-    inputError: {
-        borderColor: '#FF5252',
+        margin: 16,
     },
     errorText: {
         color: '#FF5252',
         fontSize: 12,
         fontFamily: 'Roboto-Regular',
-    },
-    genderContainer: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    genderButton: {
-        flex: 1,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 8,
-        padding: 12,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    genderButtonActive: {
-        backgroundColor: '#4CAF50',
-        borderColor: '#4CAF50',
-    },
-    genderButtonText: {
-        color: '#666666',
-        fontSize: 14,
-        fontFamily: 'Roboto-Medium',
-    },
-    genderButtonTextActive: {
-        color: '#FFFFFF',
-    },
-    materialContainer: {
-         gap: 8,
-    },
-    materialButton: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 8,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     materialButtonContent: {
         flexDirection: 'row',

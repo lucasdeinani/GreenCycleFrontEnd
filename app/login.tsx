@@ -19,60 +19,53 @@ export default function LoginScreen() {
 
     const handleLogin = async () => {
         if (!username || !password) {
-            Alert.alert('Erro', 'Por favor, preencha todos os campos');
-            return;
+          Alert.alert('Erro', 'Por favor, preencha todos os campos');
+          return;
         }
-    
+      
         setIsLoading(true);
-    
+      
         try {
-            // 1. Primeiro verifica se o usuário existe na tabela usuarios
-            const usersResponse = await axios.get(`${API_BASE_URL}/usuarios`);
-            const user = usersResponse.data.find((u: any) => u.usuario === username);
-
-            console.log('Usuario recebida do frontend:',  `"${username}"`, 'Tipo:', typeof username);
-            console.log('Senha recebida do frontend:',  `"${password}"`, 'Tipo:', typeof password);
-            console.log('Usuario armazenada no banco:', `"${user.usuario}"`, 'Tipo:', typeof user.usuario);
-            console.log('Senha armazenada no banco:', `"${user.senha}"`, 'Tipo:', typeof user.senha);
-    
-            if (!user) {
-                Alert.alert('Erro', 'Usuário não encontrado');
-                return;
-            }
-    
-            // 2. Verifica a senha
-            if (user.senha !== password) {
-                Alert.alert('Erro', 'Senha incorreta');
-                return;
-            }
-    
-            // 3. Verifica se é cliente ou parceiro
-            if (userType === 'user') {
-                const clienteResponse = await axios.get(`${API_BASE_URL}/clientes`);
-                const cliente = clienteResponse.data.find((c: any) => c.id_usuarios === user.id);
-                
-                if (cliente) {
-                    router.replace('/(app)/menu');
-                } else {
-                    Alert.alert('Erro', 'Cliente não encontrado');
-                }
-            } else {
-                const parceiroResponse = await axios.get(`${API_BASE_URL}/parceiros`);
-                const parceiro = parceiroResponse.data.find((p: any) => p.id_usuarios === user.id);
-                
-                if (parceiro) {
-                    router.replace('/(app)/menu_parceiro');
-                } else {
-                    Alert.alert('Erro', 'Parceiro não encontrado');
-                }
-            }
+          let endpoint = '';
+          let redirectRoute = '';
+      
+          // Define o endpoint e rota de redirecionamento com base no tipo de usuário
+          if (userType === 'user') {
+            endpoint = `${API_BASE_URL}/clientes/por-usuario/${username}/`;
+            redirectRoute = '/(app)/menu';
+          } else {
+            endpoint = `${API_BASE_URL}/parceiros/por-usuario/${username}/`;
+            redirectRoute = '/(app)/menu_parceiro';
+          }
+      
+          // Faz a requisição para o endpoint específico
+          const response = await axios.get(endpoint);
+          const userData = response.data;
+      
+          console.log('Dados recebidos:', userData);
+      
+          // Verifica se a senha está correta
+          if (userData.id_usuarios.senha !== password) {
+            Alert.alert('Erro', 'Senha incorreta');
+            return;
+          }
+      
+          // Se chegou aqui, o login foi bem-sucedido
+          Alert.alert('Sucesso', 'Login realizado com sucesso!');
+          router.replace(redirectRoute);
+      
         } catch (error) {
-            console.error('Erro ao fazer login:', error);
+          console.error('Erro ao fazer login:', error);
+          
+          if (axios.isAxiosError(error) && error.response?.status === 404) {
+            Alert.alert('Erro', 'Usuário não encontrado');
+          } else {
             Alert.alert('Erro', 'Não foi possível fazer login. Verifique sua conexão.');
+          }
         } finally {
-            setIsLoading(false);
+          setIsLoading(false);
         }
-    };
+      };
 
     const handleRegister = () => {
         router.push('/register');

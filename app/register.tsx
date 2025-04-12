@@ -15,6 +15,7 @@ import { ArrowLeft, Leaf, Check } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { Eye, EyeOff } from 'lucide-react-native';
+import { useUser } from './context/UserContext';
 
 const MATERIAL_OPTIONS = [
     'Metais',
@@ -47,6 +48,7 @@ export default function RegisterScreen() {
 
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const { login } = useUser();
 
     const handleChange = (field: string, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -151,51 +153,45 @@ export default function RegisterScreen() {
         if (validateForm()) {
             setIsLoading(true);
             
-            // Cria cliente já com a relação ao usuário
-            // Cria parceiro já com a relação ao usuário e materiais_parceiros
             try {
-                // Preparar payload baseado no tipo de usuário
-                let payload: any;
-                const endpoint = userType === 'client' ? 'clientes' : 'parceiros';
-    
-                if (userType === 'client') {
-                    // Payload para cliente
-                    payload = {
-                        usuario: formData.username.trim(),
-                        cpf: formData.document,
-                        data_nascimento: formData.birthday.toISOString().split('T')[0],
-                        sexo: formData.gender[0], // Pega apenas a primeira letra (M/F/O)
-                        nome: formData.fullName,
-                        email: formData.email.trim(),
-                        senha: formData.password,
-                        id_endereco: null
-                    };
-                } else {
-                    // Payload para parceiro
-                    payload = {
-                        usuario: formData.username.trim(),
-                        cnpj: formData.document,
-                        nome: formData.fullName,
-                        email: formData.email.trim(),
-                        senha: formData.password,
-                        id_endereco: null,
-                        materiais: formData.collectionMaterials.map(material => 
-                            MATERIAL_OPTIONS.indexOf(material) + 1 // Converte para IDs dos materiais
-                        )
-                    };
-                }
-    
-                console.log(`Enviando para /${endpoint}/:`, payload);
-    
-                // Fazer a chamada única para o endpoint correto
-                await axios.post(`${API_BASE_URL}/${endpoint}/`, payload);
-    
-                Alert.alert(
-                    'Sucesso',
-                    'Cadastro realizado com sucesso!',
-                    [{ text: 'OK', onPress: () => router.replace('/login') }]
-                );
-    
+              // CORREÇÃO: Preparar payload ANTES da chamada à API
+              let payload: any;
+              const endpoint = userType === 'client' ? 'clientes' : 'parceiros';
+        
+              if (userType === 'client') {
+                payload = {
+                  usuario: formData.username.trim(),
+                  cpf: formData.document.replace(/\D/g, ''), // Remove formatação
+                  data_nascimento: formData.birthday.toISOString().split('T')[0],
+                  sexo: formData.gender[0].toUpperCase(), // Pega primeira letra (M/F/O)
+                  nome: formData.fullName,
+                  email: formData.email.trim(),
+                  senha: formData.password,
+                  id_endereco: null
+                };
+              } else {
+                payload = {
+                  usuario: formData.username.trim(),
+                  cnpj: formData.document.replace(/\D/g, ''), // Remove formatação
+                  nome: formData.fullName,
+                  email: formData.email.trim(),
+                  senha: formData.password,
+                  id_endereco: null,
+                  materiais: formData.collectionMaterials.map(material => 
+                    MATERIAL_OPTIONS.indexOf(material) + 1
+                  )
+                };
+              }
+        
+              console.log('Payload sendo enviado:', payload); // Para debug
+        
+              await axios.post(`${API_BASE_URL}/${endpoint}/`, payload);
+        
+              Alert.alert(
+                'Sucesso',
+                'Cadastro realizado com sucesso!',
+                [{ text: 'OK', onPress: () => router.replace('/login') }]
+              );
             } catch (error: any) {
                 console.error('Erro ao criar cadastro:', error);
     
@@ -542,18 +538,15 @@ const styles = StyleSheet.create({
     toggleText: {
         fontFamily: 'Roboto-Medium',
         fontSize: 16,
-        color: '#666666',
+        color: '#666',
     },
     toggleTextActive: {
         color: '#333333',
     },
     form: {
-        padding: 16,
-        gap: 16,
         marginBottom: 16,
     },
     inputGroup: {
-        gap: 8,
         marginBottom: 16,
     },
     label: {
@@ -569,8 +562,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'Roboto-Regular',
         color: '#333333',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     inputError: {
         borderColor: '#FF5252',
@@ -578,22 +569,18 @@ const styles = StyleSheet.create({
     },
     genderContainer: {
         flexDirection: 'row',
-        gap: 12,
         justifyContent: 'space-between',
     },
     genderButton: {
         flex: 1,
         padding: 12,
         marginHorizontal: 4,
-        backgroundColor: '#FFFFFF',
-        borderColor: '#E0E0E0',
+        backgroundColor: '#E0E0E0',
         borderRadius: 8,
-        borderWidth: 1,
         alignItems: 'center',
     },
     genderButtonActive: {
         backgroundColor: '#4CAF50',
-        borderColor: '#4CAF50',
     },
     genderButtonText: {
         color: '#333333',
@@ -610,17 +597,92 @@ const styles = StyleSheet.create({
     materialButton: {
         flexDirection: 'row',
         alignItems: 'center',
+        padding: 12,
+        backgroundColor: '#E0E0E0',
+        borderRadius: 8,
+        margin: 16,
+    },
+    toggleButton: {
+        flex: 1,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    toggleButtonActive: {
+        backgroundColor: '#FFC107',
+    },
+    toggleText: {
+        fontFamily: 'Roboto-Medium',
+        fontSize: 16,
+        color: '#666666',
+    },
+    toggleTextActive: {
+        color: '#333333',
+    },
+    form: {
+        padding: 16,
+        gap: 16,
+    },
+    inputGroup: {
+        gap: 8,
+    },
+    label: {
+        fontSize: 14,
+        fontFamily: 'Roboto-Medium',
+        color: '#666666',
+    },
+    input: {
         backgroundColor: '#FFFFFF',
         borderRadius: 8,
         padding: 12,
+        fontSize: 16,
+        fontFamily: 'Roboto-Regular',
+        color: '#333333',
         borderWidth: 1,
         borderColor: '#E0E0E0',
-        margin: 16,
+    },
+    inputError: {
+        borderColor: '#FF5252',
     },
     errorText: {
         color: '#FF5252',
         fontSize: 12,
         fontFamily: 'Roboto-Regular',
+    },
+    genderContainer: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    genderButton: {
+        flex: 1,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    genderButtonActive: {
+        backgroundColor: '#4CAF50',
+        borderColor: '#4CAF50',
+    },
+    genderButtonText: {
+        color: '#666666',
+        fontSize: 14,
+        fontFamily: 'Roboto-Medium',
+    },
+    genderButtonTextActive: {
+        color: '#FFFFFF',
+    },
+    materialContainer: {
+         gap: 8,
+    },
+    materialButton: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
     },
     materialButtonContent: {
         flexDirection: 'row',

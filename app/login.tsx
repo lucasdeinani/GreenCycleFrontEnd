@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Pressable, Modal, Alert } from 'react-native';
+import { 
+    View, Text, TextInput, TouchableOpacity, StyleSheet, 
+    Pressable, Modal, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Eye, EyeOff, Leaf, X } from 'lucide-react-native';
 import axios from 'axios';
+import { useUser } from './context/UserContext';
 
 // URL base da API
 const API_BASE_URL = 'http://192.168.0.86:8000/v1';
@@ -16,6 +19,7 @@ export default function LoginScreen() {
     const [recoveryEmail, setRecoveryEmail] = useState('');
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const { login } = useUser();
 
     const handleLogin = async () => {
         if (!username || !password) {
@@ -26,32 +30,27 @@ export default function LoginScreen() {
         setIsLoading(true);
       
         try {
-          let endpoint = '';
-          let redirectRoute = '';
+          const endpoint = userType === 'user' 
+            ? `${API_BASE_URL}/clientes/por-usuario/${username}/`
+            : `${API_BASE_URL}/parceiros/por-usuario/${username}/`;
       
-          // Define o endpoint e rota de redirecionamento com base no tipo de usuário
-          if (userType === 'user') {
-            endpoint = `${API_BASE_URL}/clientes/por-usuario/${username}/`;
-            redirectRoute = '/(app)/menu';
-          } else {
-            endpoint = `${API_BASE_URL}/parceiros/por-usuario/${username}/`;
-            redirectRoute = '/(app)/menu_parceiro';
-          }
-      
-          // Faz a requisição para o endpoint específico
           const response = await axios.get(endpoint);
           const userData = response.data;
       
-          console.log('Dados recebidos:', userData);
-      
-          // Verifica se a senha está correta
+          // Verificação de senha
           if (userData.id_usuarios.senha !== password) {
             Alert.alert('Erro', 'Senha incorreta');
             return;
           }
       
-          // Se chegou aqui, o login foi bem-sucedido
-          Alert.alert('Sucesso', 'Login realizado com sucesso!');
+          // Login no contexto
+          await login(userData, userType === 'user' ? 'client' : 'partner');
+      
+          // Redirecionamento
+          const redirectRoute = userType === 'user' 
+            ? '/(app)/menu' 
+            : '/(app)/menu_parceiro';
+          
           router.replace(redirectRoute);
       
         } catch (error) {

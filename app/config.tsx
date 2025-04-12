@@ -8,3 +8,7 @@ export const MATERIAL_OPTIONS = [
     'Residuo Organico',
     'Residuo Hospitalar'
 ];
+
+export default function Config() {
+    return null;
+  }

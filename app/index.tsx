@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { Leaf } from 'lucide-react-native';
+import React from 'react';
+
 
 export default function SplashScreen() {
   const fadeAnim = new Animated.Value(0);

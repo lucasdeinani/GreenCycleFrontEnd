@@ -29,7 +29,7 @@ export default function LoginScreen() {
           let endpoint = '';
           let redirectRoute = '';
       
-          // Define o endpoint e rota de redirecionamento com base no tipo de usuário
+          // Define o endpoint e rota de redirecionamento com base no tipo de usuário TESTE DE COMMIT
           if (userType === 'user') {
             endpoint = `${API_BASE_URL}/clientes/por-usuario/${username}/`;
             redirectRoute = '/(app)/menu';

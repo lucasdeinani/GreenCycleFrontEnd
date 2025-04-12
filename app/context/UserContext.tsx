@@ -49,6 +49,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (apiResponse: any, type: 'client' | 'partner') => {
+    console.log('Resposta completa da API:', JSON.stringify(apiResponse, null, 2));
+
     const baseUser = {
       id: apiResponse.id_usuarios.id,
       usuario: apiResponse.id_usuarios.usuario,
@@ -74,6 +76,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             preco: m.preco
           }))
         };
+
+    console.log('Objeto userToStore que será salvo:', JSON.stringify(userToStore, null, 2));
   
     await AsyncStorage.setItem('user', JSON.stringify(userToStore));
     setUser(userToStore);
@@ -102,5 +106,5 @@ export const useUser = () => {
 };
 
 export default function DummyComponent() {
-    return null;
-};
+  return null;
+}

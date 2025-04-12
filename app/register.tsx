@@ -16,14 +16,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { useUser } from './context/UserContext';
-
-const MATERIAL_OPTIONS = [
-    'Metais',
-    'Papeis',
-    'Plastico',
-    'Residuo Organico',
-    'Residuo Hospitalar'
-];
+import { REGISTER_MATERIALS } from './configs';
 
 // URL base da API
 const API_BASE_URL = 'http://192.168.0.86:8000/v1';
@@ -177,9 +170,10 @@ export default function RegisterScreen() {
                   email: formData.email.trim(),
                   senha: formData.password,
                   id_endereco: null,
-                  materiais: formData.collectionMaterials.map(material => 
-                    MATERIAL_OPTIONS.indexOf(material) + 1
-                  )
+                  materiais: formData.collectionMaterials.map(materialName => {
+                    const material = REGISTER_MATERIALS.find(m => m.name === materialName);
+                    return material ? material.id : 0;
+                  }).filter(id => id !== 0)
                 };
               }
         
@@ -343,42 +337,42 @@ export default function RegisterScreen() {
                 )}
 
                 {userType === 'partner' && (
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Materiais que deseja coletar</Text>
-                        <View style={styles.materialContainer}>
-                            {MATERIAL_OPTIONS.map((material) => (
-                                <TouchableOpacity
-                                    key={material}
-                                    style={[
-                                        styles.materialButton,
-                                        formData.collectionMaterials.includes(material) && styles.materialButtonActive
-                                    ]}
-                                    onPress={() => handleMaterialToggle(material)}
-                                    disabled={isLoading}
-                                >
-                                    <View style={styles.materialButtonContent}>
-                                        <View style={[
-                                            styles.checkbox,
-                                            formData.collectionMaterials.includes(material) && styles.checkboxActive
-                                        ]}>
-                                            {formData.collectionMaterials.includes(material) && (
-                                                <Check size={16} color="#FFFFFF" />
-                                            )}
-                                        </View>
-                                        <Text style={[
-                                            styles.materialButtonText,
-                                            formData.collectionMaterials.includes(material) && styles.materialButtonTextActive
-                                        ]}>
-                                            {material}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-                            ))}
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Materiais que deseja coletar</Text>
+                    <View style={styles.materialContainer}>
+                    {REGISTER_MATERIALS.map((material) => (
+                        <TouchableOpacity
+                        key={material.id}
+                        style={[
+                            styles.materialButton,
+                            formData.collectionMaterials.includes(material.name) && styles.materialButtonActive
+                        ]}
+                        onPress={() => handleMaterialToggle(material.name)}
+                        disabled={isLoading}
+                        >
+                        <View style={styles.materialButtonContent}>
+                            <View style={[
+                            styles.checkbox,
+                            formData.collectionMaterials.includes(material.name) && styles.checkboxActive
+                            ]}>
+                            {formData.collectionMaterials.includes(material.name) && (
+                                <Check size={16} color="#FFFFFF" />
+                            )}
+                            </View>
+                            <Text style={[
+                            styles.materialButtonText,
+                            formData.collectionMaterials.includes(material.name) && styles.materialButtonTextActive
+                            ]}>
+                            {material.name}
+                            </Text>
                         </View>
-                        {errors.collectionMaterials && (
-                            <Text style={styles.errorText}>{errors.collectionMaterials}</Text>
-                        )}
+                        </TouchableOpacity>
+                    ))}
                     </View>
+                    {errors.collectionMaterials && (
+                    <Text style={styles.errorText}>{errors.collectionMaterials}</Text>
+                    )}
+                </View>
                 )}
 
                 {userType === 'client' && (

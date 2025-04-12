@@ -6,16 +6,28 @@ import {
 import { router } from 'expo-router';
 import { ArrowLeft, Camera } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useUser } from '../context/UserContext';
 
 export default function ProfileScreen() {
+  const { user } = useUser();
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const getFullGenderName = (initial?: string | null): string => {
+    switch (initial?.toUpperCase()) {
+      case 'M': return 'Masculino';
+      case 'F': return 'Feminino';
+      case 'O': return 'Outro';
+      default: return 'Masculino'; // Valor padrão quando não definido
+    }
+  };
+
   const [formData, setFormData] = useState({
-    fullName: 'Nome Usuario',
-    email: 'usuario@email.com',
-    document: '123.456.789-00',
-    gender: 'Masculino',
-    birthday: new Date('1990-01-01'),
-    username: 'usuario123',
+    fullName: user?.nome || '',
+    email: user?.email || '',
+    document: user?.cpf || '',
+    gender: getFullGenderName(user?.sexo),
+    birthday: user?.data_nascimento ? new Date(user.data_nascimento) : new Date('1990-01-01'),
+    username: user?.usuario || '',
   });
 
   const handleChange = (field: string, value: string) => {

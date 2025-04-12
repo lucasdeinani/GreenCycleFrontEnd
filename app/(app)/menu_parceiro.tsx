@@ -1,8 +1,11 @@
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { MapPin, Package, Video, LogOut, Leaf, User } from 'lucide-react-native';
+import { useUser } from '../context/UserContext';
 
 export default function MenuParceiroScreen() {
+  const { user, setUser } = useUser();
+  console.log('Usuário no contexto:', user);
   const handleLogout = () => {
     router.replace('/login');
   };
@@ -15,7 +18,7 @@ export default function MenuParceiroScreen() {
             source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=180&h=180&fit=crop&q=80&auto=format' }}
             style={styles.profileImage}
           />
-          <Text style={styles.profileName}>Nome Parceiro</Text>
+          <Text style={styles.profileName}>{user?.nome ?? 'Parceiro'}</Text>
         </View>
 
         <View style={styles.menuButtons}>

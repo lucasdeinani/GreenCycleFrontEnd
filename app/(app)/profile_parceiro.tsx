@@ -1,40 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, TextInput, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Camera, Check } from 'lucide-react-native';
-
-const MATERIAL_OPTIONS = [
-  'Metais',
-  'Papeis',
-  'Plastico',
-  'Residuo Organico',
-  'Residuo Hospitalar'
-];
+import { useUser } from '../context/UserContext';
+import { REGISTER_MATERIALS } from '../configs';
 
 export default function ProfileParceiroScreen() {
+  const { user } = useUser();
+
   const [formData, setFormData] = useState({
-    fullName: 'Nome Parceiro',
-    email: 'parceiro@email.com',
-    document: '12.345.678/0001-90',
-    username: 'parceiro123',
-    collectionMaterials: ['Metais', 'Papeis'] as string[],
+    fullName: '',
+    email: '',
+    document: '',
+    username: '',
+    collectionMaterials: [] as string[],
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        fullName: user.nome || '',
+        email: user.email || '',
+        document: user.cnpj || '',
+        username: user.usuario || '',
+        collectionMaterials: user.materiais?.map(m => m.nome) || [],
+      });
+    }
+  }, [user]);
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleMaterialToggle = (material: string) => {
+  const handleMaterialToggle = (materialName: string) => {
     setFormData(prev => {
-      const materials = prev.collectionMaterials.includes(material)
-        ? prev.collectionMaterials.filter(m => m !== material)
-        : [...prev.collectionMaterials, material];
+      const materials = prev.collectionMaterials.includes(materialName)
+        ? prev.collectionMaterials.filter(m => m !== materialName)
+        : [...prev.collectionMaterials, materialName];
       return { ...prev, collectionMaterials: materials };
     });
   };
 
   const handleTakePicture = () => {
     console.log('Open camera');
+  };
+
+  const isMaterialSelected = (materialName: string) => {
+    return formData.collectionMaterials.some(
+      selectedMaterial => selectedMaterial.toLowerCase() === materialName.toLowerCase()
+    );
   };
 
   return (
@@ -97,29 +111,29 @@ export default function ProfileParceiroScreen() {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Materiais que coleta</Text>
           <View style={styles.materialContainer}>
-            {MATERIAL_OPTIONS.map((material) => (
+            {REGISTER_MATERIALS.map((material) => (
               <TouchableOpacity
-                key={material}
+                key={material.id}
                 style={[
                   styles.materialButton,
-                  formData.collectionMaterials.includes(material) && styles.materialButtonActive
+                  isMaterialSelected(material.name) && styles.materialButtonActive
                 ]}
-                onPress={() => handleMaterialToggle(material)}
+                onPress={() => handleMaterialToggle(material.name)}
               >
                 <View style={styles.materialButtonContent}>
                   <View style={[
                     styles.checkbox,
-                    formData.collectionMaterials.includes(material) && styles.checkboxActive
+                    isMaterialSelected(material.name) && styles.checkboxActive
                   ]}>
-                    {formData.collectionMaterials.includes(material) && (
+                    {isMaterialSelected(material.name) && (
                       <Check size={16} color="#FFFFFF" />
                     )}
                   </View>
                   <Text style={[
                     styles.materialButtonText,
-                    formData.collectionMaterials.includes(material) && styles.materialButtonTextActive
+                    isMaterialSelected(material.name) && styles.materialButtonTextActive
                   ]}>
-                    {material}
+                    {material.name}
                   </Text>
                 </View>
               </TouchableOpacity>

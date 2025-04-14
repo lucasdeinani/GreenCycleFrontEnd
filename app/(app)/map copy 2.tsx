@@ -1,16 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform, Modal, FlatList } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Leaf, X, Info } from 'lucide-react-native';
-import { MATERIALS } from '../configs'
 import * as Location from 'expo-location';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import MapView, { Marker } from 'react-native-maps';
 
 // Tipagem para os pontos de coleta
 interface Material {
     id: number;
-    name: string;
+    nome: string;
 }
 
 interface Endereco {
@@ -26,20 +23,28 @@ interface Endereco {
     longitude?: number;
 }
 
-interface Parceiro {
-    id: number;
-    cnpj: string;
-    id_usuarios: number;
-}
-
 interface PontoColeta {
     id: number;
     nome: string;
-    id_enderecos: Endereco; 
+    id_enderecos: number;
+    endereco?: Endereco;
     descricao: string;
     horario_funcionamento: string;
-    id_parceiros: Parceiro;
-    materiais: Material[];
+    id_parceiros: number;
+    materiais: number[];
+    materiaisInfo?: Material[];
+}
+
+// Platform-specific map imports
+let MapView, Marker;
+if (Platform.OS !== 'web') {
+    try {
+        const RNMaps = require('react-native-maps');
+        MapView = RNMaps.default;
+        Marker = RNMaps.Marker;
+    } catch (err) {
+        console.warn('react-native-maps failed to load:', err);
+    }
 }
 
 export default function MapScreen() {
@@ -50,46 +55,6 @@ export default function MapScreen() {
     const [filtroMateriais, setFiltroMateriais] = useState<number[]>([]);
     const [pontoSelecionado, setPontoSelecionado] = useState<PontoColeta | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
-    const [geocodingError, setGeocodingError] = useState<string | null>(null);
-    const mapRef = useRef<MapView>(null);
-
-    const CACHE_KEYS = {
-        PONTOS_COLETA: 'pontosColeta',
-        LAST_FETCH: 'lastFetch',
-    };
-
-
-    const geocodificarComOSM = async (endereco: Endereco): Promise<{ latitude: number; longitude: number } | null> => {
-        try {
-            setGeocodingError(null);
-          // Formata o endereço para a API Nominatim
-            const enderecoFormatado = [
-                endereco.numero,
-                endereco.rua,
-                endereco.bairro,
-                endereco.cidade,
-                endereco.estado,
-                'Brasil'
-            ].filter(Boolean).join(', ');
-      
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(enderecoFormatado)}`
-          );
-          
-          const data = await response.json();
-          
-          if (data && data.length > 0) {
-            return {
-              latitude: parseFloat(data[0].lat),
-              longitude: parseFloat(data[0].lon)
-            };
-          }
-          return null;
-        } catch (error) {
-            setGeocodingError('Erro ao converter endereços em coordenadas');
-            return null;
-        }
-    };
 
     useEffect(() => {
         (async () => {
@@ -118,54 +83,75 @@ export default function MapScreen() {
             const response = await fetch('http://localhost:8000/v1/materiais/');
             const data = await response.json();
             setMateriais(data);
+
+            // Dados de exemplo caso a API não esteja disponível
+            /* 
+            const materiaisExemplo: Material[] = [
+              { id: 1, nome: 'Papel' },
+              { id: 2, nome: 'Plástico' },
+              { id: 3, nome: 'Vidro' },
+              { id: 4, nome: 'Metal' },
+              { id: 5, nome: 'Eletrônicos' },
+              { id: 6, nome: 'Óleo' },
+              { id: 7, nome: 'Pilhas' },
+            ];
+            setMateriais(materiaisExemplo);
+            */
         } catch (error) {
             console.error('Erro ao buscar materiais:', error);
-            // Fallback para MATERIALS de configs.tsx
-            setMateriais(MATERIALS);
+            // Fallback para dados locais em caso de erro
+            const materiaisExemplo: Material[] = [
+                { id: 1, nome: 'Papel' },
+                { id: 2, nome: 'Plástico' },
+                { id: 3, nome: 'Vidro' },
+                { id: 4, nome: 'Metal' },
+                { id: 5, nome: 'Eletrônicos' },
+                { id: 6, nome: 'Óleo' },
+                { id: 7, nome: 'Pilhas' },
+            ];
+            setMateriais(materiaisExemplo);
         }
     };
 
     // Função para buscar pontos de coleta da API
     const fetchPontosColeta = async () => {
         try {
+            // Buscar pontos de coleta da API
             const response = await fetch('http://localhost:8000/v1/pontos-coleta/');
-            const pontosData: PontoColeta[] = await response.json();
+            const pontosData = await response.json();
 
-            // Processar cada ponto para obter coordenadas
-            const pontosComCoordenadas = await Promise.all(
-            pontosData.map(async (ponto) => {
-                // Se já tiver coordenadas, retorna como está
-                if (ponto.id_enderecos.latitude && ponto.id_enderecos.longitude) {
-                return ponto;
+            // Para cada ponto de coleta, buscar informações do endereço
+            const pontosCompletos = await Promise.all(pontosData.map(async (ponto: PontoColeta) => {
+                // Buscar detalhes do endereço
+                const enderecoResponse = await fetch(`http://localhost:8000/v1/enderecos/${ponto.id_enderecos}/`);
+                const endereco = await enderecoResponse.json();
+
+                // Geocodificar o endereço para obter latitude e longitude
+                const coordenadas = await geocodificarEndereco(endereco);
+                if (coordenadas) {
+                    endereco.latitude = coordenadas.latitude;
+                    endereco.longitude = coordenadas.longitude;
                 }
-                
-                // Geocodifica com OpenStreetMap
-                const coordenadas = await geocodificarComOSM(ponto.id_enderecos);
-                
-                if (!coordenadas) {
-                console.warn(`Não foi possível geocodificar: ${ponto.id_enderecos.rua}, ${ponto.id_enderecos.numero}`);
-                return null; // Retorna null para pontos sem coordenadas
-                }
-                
+
+                // Buscar detalhes dos materiais
+                const materiaisDetalhados = await Promise.all(ponto.materiais.map(async (materialId: number) => {
+                    try {
+                        const materialResponse = await fetch(`http://localhost:8000/v1/materiais/${materialId}/`);
+                        return await materialResponse.json();
+                    } catch (e) {
+                        // Se não conseguir buscar o detalhe do material, retorna um objeto básico
+                        return { id: materialId, nome: `Material ${materialId}` };
+                    }
+                }));
+
                 return {
-                ...ponto,
-                id_enderecos: {
-                    ...ponto.id_enderecos,
-                    latitude: coordenadas.latitude,
-                    longitude: coordenadas.longitude
-                }
+                    ...ponto,
+                    endereco,
+                    materiaisInfo: materiaisDetalhados
                 };
-            })
-            );
+            }));
 
-            // Filtra apenas pontos válidos (não nulos)
-            const pontosValidos = pontosComCoordenadas.filter(Boolean) as PontoColeta[];
-            
-            console.log('Pontos processados:', pontosValidos);
-            setPontosColeta(pontosValidos);
-
-            // Salva no AsyncStorage para uso offline
-            await AsyncStorage.setItem('pontosColeta', JSON.stringify(pontosValidos));
+            setPontosColeta(pontosCompletos);
 
         } catch (error) {
             console.error('Erro ao buscar pontos de coleta:', error);
@@ -175,7 +161,8 @@ export default function MapScreen() {
                 {
                     id: 1,
                     nome: "Ponto Coleta 1",
-                    id_enderecos: {
+                    id_enderecos: 1,
+                    endereco: {
                         id: 1,
                         cep: "95072000",
                         estado: "RS",
@@ -188,17 +175,19 @@ export default function MapScreen() {
                     },
                     descricao: "Ponto de coleta principal",
                     horario_funcionamento: "9h - 18h | seg - sex",
-                    id_parceiros: {
-                        id: 12,
-                        cnpj: "56.150.612/0001-15",
-                        id_usuarios: 53
-                    },
-                    materiais: MATERIALS.slice(0, 3)
+                    id_parceiros: 12,
+                    materiais: [1, 2, 3],
+                    materiaisInfo: [
+                        { id: 1, nome: 'Papel' },
+                        { id: 2, nome: 'Plástico' },
+                        { id: 3, nome: 'Vidro' }
+                    ]
                 },
                 {
                     id: 2,
                     nome: "Ponto Coleta 2",
-                    id_enderecos: {
+                    id_enderecos: 2,
+                    endereco: {
                         id: 2,
                         cep: "95072001",
                         estado: "RS",
@@ -211,17 +200,18 @@ export default function MapScreen() {
                     },
                     descricao: "Ponto Coleta 2 - Teste",
                     horario_funcionamento: "10h - 12h | 14h - 16h | ter - sex",
-                    id_parceiros: {
-                        id: 13,
-                        cnpj: "57.393.898/0001-22",
-                        id_usuarios: 56
-                    },
-                    materiais: MATERIALS.slice(0, 3)
+                    id_parceiros: 12,
+                    materiais: [4, 5],
+                    materiaisInfo: [
+                        { id: 4, nome: 'Metal' },
+                        { id: 5, nome: 'Eletrônicos' }
+                    ]
                 },
                 {
                     id: 3,
                     nome: "Ponto Coleta 3",
-                    id_enderecos: {
+                    id_enderecos: 3,
+                    endereco: {
                         id: 3,
                         cep: "95072002",
                         estado: "RS",
@@ -234,12 +224,12 @@ export default function MapScreen() {
                     },
                     descricao: "Coleta de materiais eletrônicos e pilhas",
                     horario_funcionamento: "13h - 19h | seg - sáb",
-                    id_parceiros: {
-                        id: 14,
-                        cnpj: "21.191.799/0001-10",
-                        id_usuarios: 58
-                    },
-                    materiais: MATERIALS.slice(0, 3)
+                    id_parceiros: 13,
+                    materiais: [5, 7],
+                    materiaisInfo: [
+                        { id: 5, nome: 'Eletrônicos' },
+                        { id: 7, nome: 'Pilhas' }
+                    ]
                 }
             ];
 
@@ -249,7 +239,14 @@ export default function MapScreen() {
 
     // Função para obter os nomes dos materiais de um ponto específico
     const getNomesMateriais = (ponto: PontoColeta) => {
-        return ponto.materiais.map(m => m.nome).join(', ');
+        if (ponto.materiaisInfo) {
+            return ponto.materiaisInfo.map(m => m.nome).join(', ');
+        }
+
+        return ponto.materiais
+            .map(id => materiais.find(m => m.id === id)?.nome)
+            .filter(Boolean)
+            .join(', ');
     };
 
     // Função para alternar o filtro de materiais
@@ -264,9 +261,7 @@ export default function MapScreen() {
     // Filtrar pontos de coleta com base nos materiais selecionados
     const pontosFiltrados = filtroMateriais.length > 0
         ? pontosColeta.filter(ponto =>
-            ponto.materiais.some(material => 
-                filtroMateriais.includes(material.id) // Comparar com material.id
-            )
+            ponto.materiais.some(materialId => filtroMateriais.includes(materialId))
         )
         : pontosColeta;
 
@@ -333,41 +328,36 @@ export default function MapScreen() {
                 <MapView
                     style={styles.map}
                     initialRegion={{
-                        latitude: location?.coords.latitude || -14.2350, // Fallback para Brasil
-                        longitude: location?.coords.longitude || -51.9253,
-                        latitudeDelta: 0.5, // Zoom mais amplo inicial
-                        longitudeDelta: 0.5
+                        latitude: location.coords.latitude,
+                        longitude: location.coords.longitude,
+                        latitudeDelta: 0.0922,
+                        longitudeDelta: 0.0421,
                     }}
-                    ref={mapRef}
-                    >
-                    {/* Marcador do usuário */}
-                    {location && (
+                >
+                    {Marker && (
                         <Marker
-                        coordinate={{
-                            latitude: location.coords.latitude,
-                            longitude: location.coords.longitude
-                        }}
-                        title="Sua localização"
-                        pinColor="#4CAF50"
+                            coordinate={{
+                                latitude: location.coords.latitude,
+                                longitude: location.coords.longitude,
+                            }}
+                            title="Sua localização"
+                            pinColor="#4CAF50"
                         />
                     )}
 
-                    {/* Marcadores dos pontos de coleta */}
-                    {pontosFiltrados.map((ponto) => (
-                        <Marker
-                        key={`${ponto.id}-${ponto.id_enderecos.latitude}-${ponto.id_enderecos.longitude}`}
-                        coordinate={{
-                            latitude: ponto.id_enderecos.latitude,
-                            longitude: ponto.id_enderecos.longitude
-                        }}
-                        title={ponto.nome}
-                        description={getNomesMateriais(ponto)}
-                        onPress={() => abrirDetalhesPonto(ponto)}
-                        >
-                        <View style={styles.customMarker}>
-                            <Leaf size={16} color="white" />
-                        </View>
-                        </Marker>
+                    {pontosFiltrados.map(ponto => (
+                        ponto.endereco?.latitude && ponto.endereco?.longitude && Marker && (
+                            <Marker
+                                key={ponto.id}
+                                coordinate={{
+                                    latitude: ponto.endereco.latitude,
+                                    longitude: ponto.endereco.longitude,
+                                }}
+                                title={ponto.nome}
+                                description={getNomesMateriais(ponto)}
+                                onPress={() => abrirDetalhesPonto(ponto)}
+                            />
+                        )
                     ))}
                 </MapView>
             );
@@ -379,26 +369,6 @@ export default function MapScreen() {
             </View>
         );
     };
-
-    useEffect(() => {
-        if (mapRef.current && pontosFiltrados.length > 0 && location) {
-          const coordinates = [
-            {
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude
-            },
-            ...pontosFiltrados.map(p => ({
-              latitude: p.id_enderecos.latitude,
-              longitude: p.id_enderecos.longitude
-            }))
-          ];
-      
-          mapRef.current.fitToCoordinates(coordinates, {
-            edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
-            animated: true
-          });
-        }
-      }, [pontosFiltrados, location]);
 
     return (
         <ScrollView style={styles.container}>
@@ -476,88 +446,50 @@ export default function MapScreen() {
                 visible={modalVisible}
                 onRequestClose={() => setModalVisible(false)}
             >
-            <View style={styles.modalContainer}>
-                <View style={styles.modalContent}>
-                <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>
-                    {pontoSelecionado?.nome || 'Ponto de Coleta'}
-                    </Text>
-                    <TouchableOpacity
-                    onPress={() => setModalVisible(false)}
-                    style={styles.closeButton}
-                    >
-                    <X size={24} color="#333333" />
-                    </TouchableOpacity>
-                </View>
-
-                {pontoSelecionado && (
-                    <ScrollView style={styles.modalBody}>
-                    {/* Descrição */}
-                    <View style={styles.modalSection}>
-                        <Text style={styles.modalSubtitle}>Descrição</Text>
-                        <Text style={styles.modalText}>
-                        {pontoSelecionado.descricao || 'Nenhuma descrição disponível'}
-                        </Text>
-                    </View>
-
-                    {/* Materiais */}
-                    <View style={styles.modalSection}>
-                        <Text style={styles.modalSubtitle}>Materiais</Text>
-                        <Text style={styles.modalText}>
-                        {pontoSelecionado.materiais?.length > 0 
-                            ? pontoSelecionado.materiais.map(m => m.nome).join(', ')
-                            : 'Nenhum material listado'}
-                        </Text>
-                    </View>
-
-                    {/* Horário */}
-                    <View style={styles.modalSection}>
-                        <Text style={styles.modalSubtitle}>Horário de Funcionamento</Text>
-                        <Text style={styles.modalText}>
-                        {pontoSelecionado.horario_funcionamento || 'Horário não informado'}
-                        </Text>
-                    </View>
-
-                    {/* Endereço */}
-                    <View style={styles.modalSection}>
-                        <Text style={styles.modalSubtitle}>Endereço</Text>
-                        {pontoSelecionado.id_enderecos ? (
-                        <>
-                            <Text style={styles.modalText}>
-                            {[pontoSelecionado.id_enderecos.rua, pontoSelecionado.id_enderecos.numero]
-                                .filter(Boolean).join(', ')}
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>
+                                {pontoSelecionado?.nome}
                             </Text>
-                            {pontoSelecionado.id_enderecos.complemento && (
-                            <Text style={styles.modalText}>
-                                {pontoSelecionado.id_enderecos.complemento}
-                            </Text>
-                            )}
-                            <Text style={styles.modalText}>
-                            {[
-                                pontoSelecionado.id_enderecos.bairro,
-                                pontoSelecionado.id_enderecos.cidade,
-                                pontoSelecionado.id_enderecos.estado
-                            ].filter(Boolean).join(', ')}
-                            </Text>
-                            <Text style={styles.modalText}>
-                            CEP: {pontoSelecionado.id_enderecos.cep || 'Não informado'}
-                            </Text>
-                        </>
-                        ) : (
-                        <Text style={styles.modalText}>Endereço não disponível</Text>
+                            <TouchableOpacity
+                                onPress={() => setModalVisible(false)}
+                                style={styles.closeButton}
+                            >
+                                <X size={24} color="#333333" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {pontoSelecionado && (
+                            <ScrollView style={styles.modalBody}>
+                                <Text style={styles.modalSubtitle}>Descrição</Text>
+                                <Text style={styles.modalText}>{pontoSelecionado.descricao}</Text>
+
+                                <Text style={styles.modalSubtitle}>Materiais</Text>
+                                <Text style={styles.modalText}>{getNomesMateriais(pontoSelecionado)}</Text>
+
+                                <Text style={styles.modalSubtitle}>Horário de Funcionamento</Text>
+                                <Text style={styles.modalText}>{pontoSelecionado.horario_funcionamento}</Text>
+
+                                <Text style={styles.modalSubtitle}>Endereço</Text>
+                                {pontoSelecionado.endereco && (
+                                    <Text style={styles.modalText}>
+                                        {pontoSelecionado.endereco.rua}, {pontoSelecionado.endereco.numero}{pontoSelecionado.endereco.complemento ? ` - ${pontoSelecionado.endereco.complemento}` : ''}{'\n'}
+                                        {pontoSelecionado.endereco.bairro}, {pontoSelecionado.endereco.cidade} - {pontoSelecionado.endereco.estado}{'\n'}
+                                        CEP: {pontoSelecionado.endereco.cep}
+                                    </Text>
+                                )}
+                            </ScrollView>
                         )}
-                    </View>
-                    </ScrollView>
-                )}
 
-                <TouchableOpacity
-                    style={styles.closeModalButton}
-                    onPress={() => setModalVisible(false)}
-                >
-                    <Text style={styles.closeModalButtonText}>Fechar</Text>
-                </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.closeModalButton}
+                            onPress={() => setModalVisible(false)}
+                        >
+                            <Text style={styles.closeModalButtonText}>Fechar</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
-            </View>
             </Modal>
 
             <View style={styles.footer}>
@@ -719,13 +651,10 @@ const styles = StyleSheet.create({
         marginTop: 12,
         marginBottom: 4,
     },
-    modalSection: {
-        marginBottom: 16,
-      },
     modalText: {
         fontSize: 14,
         color: '#333333',
-        marginBottom: 4,
+        marginBottom: 8,
     },
     closeModalButton: {
         backgroundColor: '#4CAF50',
@@ -739,12 +668,5 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 16,
         fontFamily: 'Roboto-Medium',
-    },
-    customMarker: {
-        backgroundColor: '#2196F3',
-        padding: 8,
-        borderRadius: 20,
-        borderWidth: 2,
-        borderColor: 'white'
     },
 });

@@ -116,24 +116,24 @@ export default function ProfileParceiroScreen() {
                 key={material.id}
                 style={[
                   styles.materialButton,
-                  isMaterialSelected(material.name) && styles.materialButtonActive
+                  isMaterialSelected(material.nome) && styles.materialButtonActive
                 ]}
-                onPress={() => handleMaterialToggle(material.name)}
+                onPress={() => handleMaterialToggle(material.nome)}
               >
                 <View style={styles.materialButtonContent}>
                   <View style={[
                     styles.checkbox,
-                    isMaterialSelected(material.name) && styles.checkboxActive
+                    isMaterialSelected(material.nome) && styles.checkboxActive
                   ]}>
-                    {isMaterialSelected(material.name) && (
+                    {isMaterialSelected(material.nome) && (
                       <Check size={16} color="#FFFFFF" />
                     )}
                   </View>
                   <Text style={[
                     styles.materialButtonText,
-                    isMaterialSelected(material.name) && styles.materialButtonTextActive
+                    isMaterialSelected(material.nome) && styles.materialButtonTextActive
                   ]}>
-                    {material.name}
+                    {material.nome}
                   </Text>
                 </View>
               </TouchableOpacity>

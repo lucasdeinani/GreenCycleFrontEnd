@@ -171,7 +171,7 @@ export default function RegisterScreen() {
                   senha: formData.password,
                   id_endereco: null,
                   materiais: formData.collectionMaterials.map(materialName => {
-                    const material = REGISTER_MATERIALS.find(m => m.name === materialName);
+                    const material = REGISTER_MATERIALS.find(m => m.nome === materialName);
                     return material ? material.id : 0;
                   }).filter(id => id !== 0)
                 };
@@ -345,25 +345,25 @@ export default function RegisterScreen() {
                         key={material.id}
                         style={[
                             styles.materialButton,
-                            formData.collectionMaterials.includes(material.name) && styles.materialButtonActive
+                            formData.collectionMaterials.includes(material.nome) && styles.materialButtonActive
                         ]}
-                        onPress={() => handleMaterialToggle(material.name)}
+                        onPress={() => handleMaterialToggle(material.nome)}
                         disabled={isLoading}
                         >
                         <View style={styles.materialButtonContent}>
                             <View style={[
                             styles.checkbox,
-                            formData.collectionMaterials.includes(material.name) && styles.checkboxActive
+                            formData.collectionMaterials.includes(material.nome) && styles.checkboxActive
                             ]}>
-                            {formData.collectionMaterials.includes(material.name) && (
+                            {formData.collectionMaterials.includes(material.nome) && (
                                 <Check size={16} color="#FFFFFF" />
                             )}
                             </View>
                             <Text style={[
                             styles.materialButtonText,
-                            formData.collectionMaterials.includes(material.name) && styles.materialButtonTextActive
+                            formData.collectionMaterials.includes(material.nome) && styles.materialButtonTextActive
                             ]}>
-                            {material.name}
+                            {material.nome}
                             </Text>
                         </View>
                         </TouchableOpacity>

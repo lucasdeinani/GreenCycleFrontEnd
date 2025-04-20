@@ -7,6 +7,7 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { useContext } from 'react';
 import React from 'react';
 import { UserProvider } from './context/UserContext';
+import { ActionSheetProvider } from '@expo/react-native-action-sheet'; 
 
 
 // Prevent splash screen from auto-hiding
@@ -35,14 +36,16 @@ export default function RootLayout() {
   }
 
   return (
-    <UserProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="login" />
-        <Stack.Screen name="register" />
-        <Stack.Screen name="(app)" options={{ headerShown: false }} />
-      </Stack>
-      <StatusBar style="light" />
-    </UserProvider>
+    <ActionSheetProvider>
+      <UserProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="register" />
+          <Stack.Screen name="(app)" options={{ headerShown: false }} />
+        </Stack>
+        <StatusBar style="light" />
+      </UserProvider>
+    </ActionSheetProvider>
   );
 }

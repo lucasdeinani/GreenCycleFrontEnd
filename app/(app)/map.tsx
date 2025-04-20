@@ -8,13 +8,16 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
-  Dimensions
+  Platform
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Leaf, X, Info, LocateFixed } from 'lucide-react-native';
+import { ArrowLeft, Leaf, X, Info, LocateFixed, Navigation } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import MapView, { Marker, MapViewProps } from 'react-native-maps';
 import { fetchPontosColeta, fetchMateriais } from '../services/api';
+import * as Linking from 'expo-linking';
+import { useActionSheet } from '@expo/react-native-action-sheet';
+
 
 // Tipagens para Materiais
 interface Material {
@@ -101,6 +104,7 @@ export default function MapScreen() {
   const [marcadorDestaque, setMarcadorDestaque] = useState<Coordinates | null>(null);
   const mapRef = useRef<MapView>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const { showActionSheetWithOptions } = useActionSheet();
 
   // Efeito para limpar o marcador destacado quando o modal fecha
   useEffect(() => {
@@ -142,6 +146,93 @@ export default function MapScreen() {
   const rolarAteMapa = useCallback(() => {
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   }, []);
+
+  const verificarAppsInstalados = async (opcoesMapas: any) => {
+    const resultados = {
+      waze: false,
+      googleMaps: false,
+      appleMaps: false
+    };
+  
+    try {
+      resultados.waze = await Linking.canOpenURL(opcoesMapas.waze);
+      resultados.googleMaps = await Linking.canOpenURL(opcoesMapas.googleMaps);
+      if (Platform.OS === 'ios') {
+        resultados.appleMaps = await Linking.canOpenURL(opcoesMapas.appleMaps);
+      }
+    } catch (error) {
+      console.error('Erro ao verificar apps:', error);
+    }
+  
+    return resultados;
+  };
+
+  const abrirMenuNavegacao = async (ponto: PontoColetaComDistancia) => {
+    const { latitude, longitude } = ponto.id_enderecos;
+    const nomeLocal = encodeURIComponent(ponto.nome);
+    type OpcaoNavegacao = 'Waze' | 'Google Maps' | 'Apple Maps' | 'Abrir no navegador' | 'Cancelar';
+    
+    const opcoesMapas = {
+      waze: `https://waze.com/ul?ll=${latitude},${longitude}&navigate=yes`,
+      googleMaps: `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`,
+      appleMaps: `http://maps.apple.com/?daddr=${latitude},${longitude}&dirflg=d`,
+      googleMapsBrowser: `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`
+    };
+  
+    // Verifica apps instalados
+    const appsDisponiveis = await verificarAppsInstalados(opcoesMapas);
+    
+    // Monta opções dinamicamente
+    const opcoesDisponiveis: OpcaoNavegacao[] = [];
+    const icons = [];
+    
+    if (appsDisponiveis.waze) {
+      opcoesDisponiveis.push('Waze');
+      icons.push(require('../assets/waze.png'));
+    }
+    
+    if (appsDisponiveis.googleMaps) {
+      opcoesDisponiveis.push('Google Maps');
+      icons.push(require('../assets/google-maps.png'));
+    }
+    
+    if (Platform.OS === 'ios' && appsDisponiveis.appleMaps) {
+      opcoesDisponiveis.push('Apple Maps');
+      icons.push(require('../assets/maps.png'));
+    }
+    
+    // Sempre mostra a opção de navegador
+    opcoesDisponiveis.push('Abrir no navegador');
+    icons.push(require('../assets/safari.png'));
+    
+    opcoesDisponiveis.push('Cancelar');
+    
+    showActionSheetWithOptions({
+      title: 'Escolha o aplicativo para navegação',
+      options: opcoesDisponiveis,
+      cancelButtonIndex: opcoesDisponiveis.length - 1,
+      ...(Platform.OS === 'ios' && { icons })
+    }, (selectedIndex) => {
+      if (selectedIndex === undefined || selectedIndex === opcoesDisponiveis.length - 1) return;
+      
+      const opcaoSelecionada = opcoesDisponiveis[selectedIndex];
+      
+      switch (opcaoSelecionada) {
+        case 'Waze':
+          Linking.openURL(opcoesMapas.waze);
+          break;
+        case 'Google Maps':
+          Linking.openURL(opcoesMapas.googleMaps);
+          break;
+        case 'Apple Maps':
+          Linking.openURL(opcoesMapas.appleMaps);
+          break;
+        case 'Abrir no navegador':
+          Linking.openURL(opcoesMapas.googleMapsBrowser);
+          break;
+      }
+    });
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -410,6 +501,17 @@ export default function MapScreen() {
 
             {pontoSelecionado && (
               <ScrollView style={styles.modalBody}>
+                {/* Abrir aplicativo de navegação */}
+                <TouchableOpacity
+                  style={styles.navegarButton}
+                  onPress={() => abrirMenuNavegacao(pontoSelecionado)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Navigation size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <Text style={styles.navegarButtonText}>Navegar até o local</Text>
+                  </View>
+                </TouchableOpacity>
+
                 <Text style={styles.modalSubtitle}>Distância</Text>
                 <Text style={styles.modalText}>
                   {pontoSelecionado.distancia !== undefined 
@@ -433,6 +535,7 @@ export default function MapScreen() {
                   {pontoSelecionado.id_enderecos.bairro}, {pontoSelecionado.id_enderecos.cidade} - {pontoSelecionado.id_enderecos.estado}{'\n'}
                   CEP: {pontoSelecionado.id_enderecos.cep}
                 </Text>
+                
               </ScrollView>
             )}
 
@@ -491,7 +594,7 @@ const styles = StyleSheet.create({
   centralizarButton: {
     position: 'absolute',
     right: 16,
-    bottom: 16,
+    top: 16,
     backgroundColor: 'white',
     borderRadius: 30,
     width: 50,
@@ -653,5 +756,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontFamily: 'Roboto-Medium',
+  },
+  navegarButton: {
+    backgroundColor: '#2196F3',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  navegarButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Medium',
+    marginLeft: 8,
   },
 });

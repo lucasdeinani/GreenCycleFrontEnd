@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import { ArrowLeft, Camera, Settings  } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useUser } from '../context/UserContext';
-import { PasswordResetModal } from './PasswordResetModal';
+import { PasswordResetModal } from './password_reset_modal';
 import axios from 'axios';
 import { API_BASE_URL } from '../configs';
 

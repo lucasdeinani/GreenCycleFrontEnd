@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { ArrowLeft, Camera, Check, Settings } from 'lucide-react-native';
 import { useUser } from '../context/UserContext';
 import { REGISTER_MATERIALS } from '../configs';
-import { PasswordResetModal } from './PasswordResetModal';
+import { PasswordResetModal } from './password_reset_modal';
 import axios from 'axios';
 import { API_BASE_URL } from '../configs';
 

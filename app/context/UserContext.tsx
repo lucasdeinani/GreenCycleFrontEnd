@@ -1,6 +1,8 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useContext } from 'react';
+import { API_BASE_URL } from '../configs'
+import axios from 'axios';
 
 type User = {
     id: number;
@@ -27,6 +29,7 @@ type UserContextType = {
   setUser: (user: User | null) => void;
   login: (userData: any, type: 'client' | 'partner') => Promise<void>;
   logout: () => Promise<void>;
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
   isAuthenticated: boolean;
 };
 
@@ -62,12 +65,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     const userToStore = type === 'client' 
       ? {
           ...baseUser,
+          id: apiResponse.id, // campo adicionado do id do cliente
           cpf: apiResponse.cpf,
           sexo: apiResponse.sexo,
           data_nascimento: apiResponse.data_nascimento
         }
       : {
           ...baseUser,
+          id: apiResponse.id, // campo adicionado do id do parceiro
           cnpj: apiResponse.cnpj,
           materiais: apiResponse.materiais.map((m: any) => ({
             id: m.id,
@@ -90,8 +95,33 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     setIsAuthenticated(false);
   };
 
+  const updatePassword = async (currentPassword: string, newPassword: string) => {
+    if (!user) return false;
+  
+    try {
+      const endpoint = user.tipo === 'client' 
+        ? `${API_BASE_URL}/clientes/${user.id}/` 
+        : `${API_BASE_URL}/parceiros/${user.id}/`;
+      
+      const response = await axios.put(
+        endpoint,
+        {
+          senha_atual: currentPassword,
+          nova_senha: newPassword
+        }
+      );
+  
+      return response.status === 200;
+    } catch (error) {
+      console.error('Erro ao atualizar senha:', error);
+      return false;
+    }
+  };
+
   return (
-    <UserContext.Provider value={{ user, setUser, login, logout, isAuthenticated }}>
+    <UserContext.Provider value={
+      { user, setUser, login, logout, updatePassword, isAuthenticated }
+      }>
       {children}
     </UserContext.Provider>
   );

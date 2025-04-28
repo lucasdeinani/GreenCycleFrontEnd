@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, TextInput, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Camera, Check } from 'lucide-react-native';
+import { ArrowLeft, Camera, Check, Settings } from 'lucide-react-native';
 import { useUser } from '../context/UserContext';
 import { REGISTER_MATERIALS } from '../configs';
+import { PasswordResetModal } from './password_reset_modal';
+import axios from 'axios';
+import { API_BASE_URL } from '../configs';
 
 export default function ProfileParceiroScreen() {
   const { user } = useUser();
+  const [resetModalVisible, setResetModalVisible] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -15,6 +19,24 @@ export default function ProfileParceiroScreen() {
     username: '',
     collectionMaterials: [] as string[],
   });
+
+  const handlePasswordReset = async (currentPassword: string, newPassword: string) => {
+    try {
+      const endpoint = user?.tipo === 'client' 
+        ? `${API_BASE_URL}/clientes/${user.id}/`
+        // @ts-ignore
+        : `${API_BASE_URL}/parceiros/${user.id}/`;
+      
+      const response = await axios.put(endpoint, {
+        senha: newPassword
+      });
+  
+      return response.status === 200;
+    } catch (error) {
+      console.error('Error updating password:', error);
+      return false;
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -109,6 +131,32 @@ export default function ProfileParceiroScreen() {
         </View>
 
         <View style={styles.inputGroup}>
+          <Text style={styles.label}>Usuário</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.username}
+            onChangeText={(value) => handleChange('username', value)}
+            autoCapitalize="none"
+          />
+        </View>
+
+        <TouchableOpacity 
+          style={styles.resetPasswordButton}
+          onPress={() => setResetModalVisible(true)}
+        >
+          <View style={styles.resetPasswordButtonContent}>
+            <Settings size={20} color="#FFFFFF" />
+            <Text style={styles.resetPasswordButtonText}>Redefinir Senha</Text>
+          </View>
+        </TouchableOpacity>
+
+        <PasswordResetModal
+          visible={resetModalVisible}
+          onClose={() => setResetModalVisible(false)}
+          onConfirm={handlePasswordReset}
+        />
+
+        <View style={styles.inputGroup}>
           <Text style={styles.label}>Materiais que coleta</Text>
           <View style={styles.materialContainer}>
             {REGISTER_MATERIALS.map((material) => (
@@ -139,16 +187,6 @@ export default function ProfileParceiroScreen() {
               </TouchableOpacity>
             ))}
           </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Usuário</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.username}
-            onChangeText={(value) => handleChange('username', value)}
-            autoCapitalize="none"
-          />
         </View>
 
         <TouchableOpacity style={styles.saveButton}>
@@ -271,6 +309,23 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Medium',
+  },
+  resetPasswordButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  resetPasswordButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  resetPasswordButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontFamily: 'Roboto-Medium',

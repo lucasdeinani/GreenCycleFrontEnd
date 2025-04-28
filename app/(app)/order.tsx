@@ -1,23 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Modal, StyleSheet, ScrollView } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Leaf } from 'lucide-react-native';
-
-// Temporary mock data
-const mockOrders = Array.from({ length: 10 }, (_, i) => ({
-  id: i + 1,
-  orderNumber: `Pedido ${i + 1}`,
-  details: `Detalhes do pedido ${i + 1}`,
-}));
+import { ArrowLeft, Leaf, ClipboardList, Plus } from 'lucide-react-native';
+import { useUser } from '../context/UserContext';
 
 export default function OrderScreen() {
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
-
-  const handleOrderPress = (order) => {
-    setSelectedOrder(order);
-    setModalVisible(true);
-  };
+  const { user } = useUser();
 
   return (
     <ScrollView style={styles.container}>
@@ -29,41 +17,54 @@ export default function OrderScreen() {
         <Text style={styles.backButtonText}>Voltar</Text>
       </TouchableOpacity>
 
-      <View style={styles.content}>
-        {mockOrders.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.orderCard}
-            onPress={() => handleOrderPress(item)}
-          >
-            <Text style={styles.orderText}>{item.orderNumber}</Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.header}>
+        <Text style={styles.title}>Solicitações</Text>
+        <Text style={styles.subtitle}>O que você deseja fazer?</Text>
       </View>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {selectedOrder?.orderNumber}
+      <View style={styles.content}>
+        <TouchableOpacity
+          style={styles.optionCard}
+          onPress={() => router.push('/request')}
+        >
+          <View style={styles.optionIconContainer}>
+            <Plus size={32} color="#FFFFFF" />
+          </View>
+          <View style={styles.optionTextContainer}>
+            <Text style={styles.optionTitle}>Nova Solicitação</Text>
+            <Text style={styles.optionDescription}>
+              Solicite uma coleta de materiais recicláveis
             </Text>
-            <Text style={styles.modalDetails}>
-              {selectedOrder?.details}
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.optionCard}
+          onPress={() => router.push('/historicRequest')}
+        >
+          <View style={[styles.optionIconContainer, { backgroundColor: '#2196F3' }]}>
+            <ClipboardList size={32} color="#FFFFFF" />
+          </View>
+          <View style={styles.optionTextContainer}>
+            <Text style={styles.optionTitle}>Histórico</Text>
+            <Text style={styles.optionDescription}>
+              Consulte seus pedidos anteriores e acompanhe o status
             </Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>Fechar</Text>
-            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.infoContainer}>
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>Como funciona?</Text>
+            <Text style={styles.infoText}>
+              1. Faça sua solicitação informando o tipo de material{'\n'}
+              2. Aguarde a confirmação de um parceiro{'\n'}
+              3. O parceiro irá até o endereço indicado fazer a coleta{'\n'}
+              4. Receba créditos pela sua contribuição ecológica
+            </Text>
           </View>
         </View>
-      </Modal>
+      </View>
 
       <View style={styles.footer}>
         <Leaf size={40} color="#4CAF50" />
@@ -89,65 +90,90 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Medium',
     color: '#333333',
   },
+  header: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  title: {
+    fontSize: 28,
+    fontFamily: 'Roboto-Bold',
+    color: '#333333',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Regular',
+    color: '#666666',
+  },
   content: {
     padding: 16,
-    gap: 12,
   },
-  orderCard: {
+  optionCard: {
     backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    marginBottom: 12,
   },
-  orderText: {
-    fontSize: 16,
-    fontFamily: 'Roboto-Medium',
-    color: '#333333',
-  },
-  modalContainer: {
-    flex: 1,
+  optionIconContainer: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 50,
+    width: 64,
+    height: 64,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    marginRight: 16,
   },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 24,
-    width: '80%',
-    maxWidth: 400,
+  optionTextContainer: {
+    flex: 1,
   },
-  modalTitle: {
-    fontSize: 20,
+  optionTitle: {
+    fontSize: 18,
     fontFamily: 'Roboto-Bold',
     color: '#333333',
-    marginBottom: 16,
+    marginBottom: 4,
   },
-  modalDetails: {
-    fontSize: 16,
+  optionDescription: {
+    fontSize: 14,
     fontFamily: 'Roboto-Regular',
     color: '#666666',
-    marginBottom: 24,
+    lineHeight: 20,
   },
-  closeButton: {
-    backgroundColor: '#2196F3',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
+  infoContainer: {
+    marginTop: 16,
   },
-  closeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Roboto-Medium',
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontFamily: 'Roboto-Bold',
+    color: '#333333',
+    marginBottom: 12,
+  },
+  infoText: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#666666',
+    lineHeight: 24,
   },
   footer: {
     alignItems: 'center',
-    padding: 16,
+    padding: 32,
+    marginTop: 16,
   },
   footerText: {
     marginTop: 8,

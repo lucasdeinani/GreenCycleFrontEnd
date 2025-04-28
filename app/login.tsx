@@ -8,7 +8,7 @@ import axios from 'axios';
 import { useUser } from './context/UserContext';
 
 // URL base da API
-const API_BASE_URL = 'http://192.168.0.86:8000/v1';
+const API_BASE_URL = '192.168.1.145';
 
 export default function LoginScreen() {
     const [userType, setUserType] = useState<'user' | 'partner'>('user');

@@ -19,7 +19,7 @@ import { useUser } from './context/UserContext';
 import { REGISTER_MATERIALS } from './configs';
 
 // URL base da API
-const API_BASE_URL = 'http://192.168.0.86:8000/v1';
+const API_BASE_URL = '192.168.1.145';
 
 export default function RegisterScreen() {
     const [userType, setUserType] = useState<'client' | 'partner'>('client');

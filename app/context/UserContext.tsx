@@ -5,24 +5,46 @@ import { API_BASE_URL } from '../configs'
 import axios from 'axios';
 
 type User = {
+  // Dados básicos do usuário (tabela usuarios)
+  user_id: number;          // ID da tabela usuarios
+  usuario: string;
+  nome: string;
+  email: string;
+  tipo: 'client' | 'partner';
+  id_endereco?: number | null;  // FK para tabela enderecos
+  
+  // IDs das tabelas relacionadas
+  client_id?: number;       // ID da tabela clientes (se tipo = 'client')
+  partner_id?: number;      // ID da tabela parceiros (se tipo = 'partner')
+  
+  // Campos específicos de cliente
+  cpf?: string;
+  sexo?: string;
+  data_nascimento?: string;
+  
+  // Campos específicos de parceiro
+  cnpj?: string;
+  materiais?: Array<{
     id: number;
-    usuario: string;
     nome: string;
-    email: string;
-    tipo: 'client' | 'partner';
-    // Campos específicos de cliente
-    cpf?: string;
-    sexo?: string;
-    data_nascimento?: string;
-    // Campos específicos de parceiro
-    cnpj?: string;
-    materiais?: Array<{
-      id: number;
-      nome: string;
-      descricao?: string;
-      preco?: string;
-    }>;
+    descricao?: string;
+    preco?: string;
+  }>;
+  
+  // Endereço
+  endereco?: {
+    id: number;
+    cep: string;
+    estado: string;
+    cidade: string;
+    bairro: string;
+    rua: string;
+    numero: number | null;
+    complemento?: string | null;
+    latitude: number;
+    longitude: number;
   };
+};
 
 type UserContextType = {
   user: User | null;
@@ -55,7 +77,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     console.log('Resposta completa da API:', JSON.stringify(apiResponse, null, 2));
 
     const baseUser = {
-      id: apiResponse.id_usuarios.id,
+      user_id: apiResponse.id_usuarios.id,
       usuario: apiResponse.id_usuarios.usuario,
       nome: apiResponse.id_usuarios.nome,
       email: apiResponse.id_usuarios.email,
@@ -65,14 +87,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     const userToStore = type === 'client' 
       ? {
           ...baseUser,
-          id: apiResponse.id, // campo adicionado do id do cliente
+          client_id: apiResponse.id, // campo adicionado do id do cliente
           cpf: apiResponse.cpf,
           sexo: apiResponse.sexo,
           data_nascimento: apiResponse.data_nascimento
         }
       : {
           ...baseUser,
-          id: apiResponse.id, // campo adicionado do id do parceiro
+          partner_id: apiResponse.id, // campo adicionado do id do parceiro
           cnpj: apiResponse.cnpj,
           materiais: apiResponse.materiais.map((m: any) => ({
             id: m.id,
@@ -100,8 +122,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   
     try {
       const endpoint = user.tipo === 'client' 
-        ? `${API_BASE_URL}/clientes/${user.id}/` 
-        : `${API_BASE_URL}/parceiros/${user.id}/`;
+        ? `${API_BASE_URL}/clientes/${user.client_id}/` 
+        : `${API_BASE_URL}/parceiros/${user.partner_id}/`;
       
       const response = await axios.put(
         endpoint,

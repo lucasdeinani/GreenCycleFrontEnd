@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, TextInput, StyleSheet, ScrollView } from 'react-native';
+import { 
+  View, Text, Image, TouchableOpacity, TextInput, StyleSheet, ScrollView, 
+  Platform, ActivityIndicator, Alert
+} from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Camera, Check, Settings } from 'lucide-react-native';
+import { ArrowLeft, Camera, Check, Edit, Lock, Save, X } from 'lucide-react-native';
 import { useUser } from '../context/UserContext';
-import { REGISTER_MATERIALS } from '../configs';
 import { PasswordResetModal } from './password_reset_modal';
+import { REGISTER_MATERIALS } from '../configs';
 import axios from 'axios';
 import { API_BASE_URL } from '../configs';
 
 export default function ProfileParceiroScreen() {
-  const { user } = useUser();
+  const { user, setUser } = useUser();
   const [resetModalVisible, setResetModalVisible] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -19,24 +25,6 @@ export default function ProfileParceiroScreen() {
     username: '',
     collectionMaterials: [] as string[],
   });
-
-  const handlePasswordReset = async (currentPassword: string, newPassword: string) => {
-    try {
-      const endpoint = user?.tipo === 'client' 
-        ? `${API_BASE_URL}/clientes/${user.id}/`
-        // @ts-ignore
-        : `${API_BASE_URL}/parceiros/${user.id}/`;
-      
-      const response = await axios.put(endpoint, {
-        senha: newPassword
-      });
-  
-      return response.status === 200;
-    } catch (error) {
-      console.error('Error updating password:', error);
-      return false;
-    }
-  };
 
   useEffect(() => {
     if (user) {
@@ -52,9 +40,35 @@ export default function ProfileParceiroScreen() {
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.fullName.trim()) {
+      newErrors.fullName = 'Nome da empresa é obrigatório';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email é obrigatório';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email inválido';
+    }
+
+    if (!formData.username.trim()) {
+      newErrors.username = 'Usuário é obrigatório';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleMaterialToggle = (materialName: string) => {
+    if (!isEditing) return;
+    
     setFormData(prev => {
       const materials = prev.collectionMaterials.includes(materialName)
         ? prev.collectionMaterials.filter(m => m !== materialName)
@@ -63,89 +77,202 @@ export default function ProfileParceiroScreen() {
     });
   };
 
-  const handleTakePicture = () => {
-    console.log('Open camera');
+  const handleSaveChanges = async () => {
+    if (!validateForm()) return;
+    if (!user?.partner_id) return;
+
+    setIsSaving(true);
+    
+    try {
+      const payload = {
+        nome: formData.fullName.trim(),
+        email: formData.email.trim(),
+        usuario: formData.username.trim(),
+        materiais: formData.collectionMaterials.map(materialName => {
+          const material = REGISTER_MATERIALS.find(m => m.nome === materialName);
+          return material ? material.id : null;
+        }).filter(id => id !== null)
+      };
+
+      const response = await axios.put(
+        `${API_BASE_URL}/parceiros/${user.partner_id}/`, 
+        payload
+      );
+
+      // Atualizar contexto com os novos dados
+      const updatedUser = {
+        ...user,
+        nome: formData.fullName,
+        email: formData.email,
+        usuario: formData.username,
+        materiais: formData.collectionMaterials.map(materialName => {
+          const material = REGISTER_MATERIALS.find(m => m.nome === materialName);
+          return {
+            id: material?.id || 0,
+            nome: materialName,
+            descricao: '',
+            preco: '0.00'
+          };
+        })
+      };
+
+      setUser(updatedUser);
+      setIsEditing(false);
+      Alert.alert('Sucesso', 'Perfil atualizado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao atualizar perfil:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar o perfil. Tente novamente.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    // Reverter para os dados originais do usuário
+    if (user) {
+      setFormData({
+        fullName: user.nome || '',
+        email: user.email || '',
+        document: user.cnpj || '',
+        username: user.usuario || '',
+        collectionMaterials: user.materiais?.map(m => m.nome) || [],
+      });
+    }
+    setIsEditing(false);
+    setErrors({});
+  };
+
+  const handlePasswordReset = async (currentPassword: string, newPassword: string) => {
+    try {
+      const endpoint = `${API_BASE_URL}/parceiros/${user?.partner_id}/`;
+      const response = await axios.patch(endpoint, {
+        senha_atual: currentPassword,
+        nova_senha: newPassword
+      });
+      return response.status === 200;
+    } catch (error) {
+      console.error('Error updating password:', error);
+      return false;
+    }
   };
 
   const isMaterialSelected = (materialName: string) => {
-    return formData.collectionMaterials.some(
-      selectedMaterial => selectedMaterial.toLowerCase() === materialName.toLowerCase()
-    );
+    return formData.collectionMaterials.includes(materialName);
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => router.back()}
-      >
-        <ArrowLeft size={24} color="#333333" />
-        <Text style={styles.backButtonText}>Voltar</Text>
-      </TouchableOpacity>
-
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <ArrowLeft size={24} color="#333333" />
+          <Text style={styles.backButtonText}>Voltar</Text>
+        </TouchableOpacity>
+
+        {isEditing ? (
+          <View style={styles.editActions}>
+            <TouchableOpacity onPress={handleCancelEdit} disabled={isSaving}>
+              <X size={24} color="#F44336" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleSaveChanges} disabled={isSaving}>
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#4CAF50" />
+              ) : (
+                <Save size={24} color="#4CAF50" />
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity onPress={() => setIsEditing(true)}>
+            <Edit size={24} color="#2196F3" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.profileSection}>
         <View style={styles.profileImageContainer}>
           <Image
             source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=180&h=180&fit=crop&q=80&auto=format' }}
             style={styles.profileImage}
           />
-          <TouchableOpacity
-            style={styles.changePhotoButton}
-            onPress={handleTakePicture}
-          >
-            <Camera size={20} color="#FFFFFF" />
-            <Text style={styles.changePhotoText}>Trocar foto</Text>
-          </TouchableOpacity>
+          {isEditing && (
+            <TouchableOpacity
+              style={styles.changePhotoButton}
+              onPress={() => console.log('Open camera')}
+            >
+              <Camera size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
       <View style={styles.form}>
+        {/* Nome da Empresa */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Nome da Empresa</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.fullName}
-            onChangeText={(value) => handleChange('fullName', value)}
-          />
+            <TextInput
+              style={[styles.input, !isEditing && styles.disabledInput]}
+              value={formData.fullName}
+              onChangeText={(value) => handleChange('fullName', value)}
+              editable={isEditing}
+              placeholder="Nome da sua empresa"
+            />
+            {isEditing && <Edit size={18} color="#666" style={styles.inputIcon} />}
+          {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
         </View>
 
+        {/* Email */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.email}
-            onChangeText={(value) => handleChange('email', value)}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+            <TextInput
+              style={[styles.input, !isEditing && styles.disabledInput]}
+              value={formData.email}
+              onChangeText={(value) => handleChange('email', value)}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              editable={isEditing}
+              placeholder="Email da empresa"
+            />
+            {isEditing && <Edit size={18} color="#666" style={styles.inputIcon} />}
+          {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
         </View>
 
+        {/* CNPJ (não editável) */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>CNPJ</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.document}
-            onChangeText={(value) => handleChange('document', value)}
-            keyboardType="numeric"
-          />
+            <TextInput
+              style={[styles.input, styles.disabledInput]}
+              value={formData.document}
+              editable={false}
+              placeholder="CNPJ da empresa"
+            />
+            <Lock size={18} color="#999" style={styles.inputIcon} />
         </View>
 
+        {/* Usuário */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Usuário</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.username}
-            onChangeText={(value) => handleChange('username', value)}
-            autoCapitalize="none"
-          />
+            <TextInput
+              style={[styles.input, !isEditing && styles.disabledInput]}
+              value={formData.username}
+              onChangeText={(value) => handleChange('username', value)}
+              autoCapitalize="none"
+              editable={isEditing}
+              placeholder="Nome de usuário"
+            />
+            {isEditing && <Edit size={18} color="#666" style={styles.inputIcon} />}
+          {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
         </View>
 
+        {/* Botão de redefinir senha */}
         <TouchableOpacity 
           style={styles.resetPasswordButton}
           onPress={() => setResetModalVisible(true)}
         >
           <View style={styles.resetPasswordButtonContent}>
-            <Settings size={20} color="#FFFFFF" />
+            <Lock size={20} color="#FFFFFF" />
             <Text style={styles.resetPasswordButtonText}>Redefinir Senha</Text>
           </View>
         </TouchableOpacity>
@@ -156,6 +283,7 @@ export default function ProfileParceiroScreen() {
           onConfirm={handlePasswordReset}
         />
 
+        {/* Materiais que coleta */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Materiais que coleta</Text>
           <View style={styles.materialContainer}>
@@ -164,9 +292,11 @@ export default function ProfileParceiroScreen() {
                 key={material.id}
                 style={[
                   styles.materialButton,
-                  isMaterialSelected(material.nome) && styles.materialButtonActive
+                  isMaterialSelected(material.nome) && styles.materialButtonActive,
+                  !isEditing && styles.disabledButton
                 ]}
                 onPress={() => handleMaterialToggle(material.nome)}
+                disabled={!isEditing}
               >
                 <View style={styles.materialButtonContent}>
                   <View style={[
@@ -188,10 +318,6 @@ export default function ProfileParceiroScreen() {
             ))}
           </View>
         </View>
-
-        <TouchableOpacity style={styles.saveButton}>
-          <Text style={styles.saveButtonText}>Salvar Alterações</Text>
-        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -202,47 +328,68 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
-  backButton: {
+  contentContainer: {
+    paddingBottom: 40,
+  },
+  header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
+    paddingTop: Platform.OS === 'ios' ? 50 : 16,
+  },
+  backButton: {
+    paddingTop: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
     gap: 8,
+  },
+  title: {
+    fontSize: 20,
+    fontFamily: 'Roboto-Bold',
+    color: '#333333',
   },
   backButtonText: {
     fontSize: 16,
     fontFamily: 'Roboto-Medium',
     color: '#333333',
   },
-  header: {
+  editActions: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  profileSection: {
     alignItems: 'center',
-    marginBottom: 24,
+    paddingVertical: 24,
   },
   profileImageContainer: {
     alignItems: 'center',
-    gap: 16,
+    position: 'relative',
   },
   profileImage: {
     width: 120,
     height: 120,
     borderRadius: 60,
+    borderWidth: 3,
+    borderColor: '#FFC107',
   },
   changePhotoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
     backgroundColor: '#2196F3',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    gap: 8,
-  },
-  changePhotoText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'Roboto-Medium',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   form: {
     padding: 16,
     gap: 16,
+    marginTop: 8,
   },
   inputGroup: {
     gap: 8,
@@ -253,14 +400,48 @@ const styles = StyleSheet.create({
     color: '#666666',
   },
   input: {
+    flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
     padding: 12,
+    paddingRight: 40,
     fontSize: 16,
     fontFamily: 'Roboto-Regular',
     color: '#333333',
     borderWidth: 1,
     borderColor: '#E0E0E0',
+  },
+  disabledInput: {
+    backgroundColor: '#FAFAFA',
+    color: '#666666',
+  },
+  inputIcon: {
+    position: 'absolute',
+    right: 12,
+  },
+  errorText: {
+    color: '#F44336',
+    fontSize: 12,
+    fontFamily: 'Roboto-Regular',
+    marginTop: 4,
+  },
+  resetPasswordButton: {
+    backgroundColor: '#2196F3',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  resetPasswordButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  resetPasswordButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Medium',
   },
   materialContainer: {
     gap: 8,
@@ -279,6 +460,9 @@ const styles = StyleSheet.create({
   },
   materialButtonActive: {
     borderColor: '#4CAF50',
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   checkbox: {
     width: 24,
@@ -300,34 +484,5 @@ const styles = StyleSheet.create({
   },
   materialButtonTextActive: {
     color: '#333333',
-  },
-  saveButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Roboto-Medium',
-  },
-  resetPasswordButton: {
-    backgroundColor: '#2196F3',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  resetPasswordButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  resetPasswordButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Roboto-Medium',
   },
 });

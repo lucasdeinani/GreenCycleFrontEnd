@@ -16,10 +16,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { useUser } from './context/UserContext';
-import { REGISTER_MATERIALS } from './configs';
-
-// URL base da API
-const API_BASE_URL = '192.168.1.145';
+import { REGISTER_MATERIALS, API_BASE_URL } from './configs';
 
 export default function RegisterScreen() {
     const [userType, setUserType] = useState<'client' | 'partner'>('client');

@@ -14,9 +14,7 @@ import { router } from 'expo-router';
 import { ArrowLeft, Leaf, Check, X, Clock, AlertTriangle, Info } from 'lucide-react-native';
 import { useUser } from '../context/UserContext';
 import axios from 'axios';
-
-// URL base da API
-const API_BASE_URL = 'http://192.168.0.86:8000/v1';
+import { API_BASE_URL } from '../configs'
 
 // Status map para tradução e cores
 const STATUS_MAP = {
@@ -96,7 +94,7 @@ export default function HistoricoColetasScreen() {
       
       setColetas(coletasOrdenadas);
     } catch (error) {
-      console.error('Erro ao buscar coletas:', error);
+      // console.error('Erro ao buscar coletas:', error);
       Alert.alert('Erro', 'Não foi possível carregar seu histórico de coletas.');
     } finally {
       setIsLoading(false);

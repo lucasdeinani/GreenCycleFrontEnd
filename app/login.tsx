@@ -6,9 +6,7 @@ import { router } from 'expo-router';
 import { Eye, EyeOff, Leaf, X } from 'lucide-react-native';
 import axios from 'axios';
 import { useUser } from './context/UserContext';
-
-// URL base da API
-const API_BASE_URL = '192.168.1.145';
+import { API_BASE_URL } from './configs'
 
 export default function LoginScreen() {
     const [userType, setUserType] = useState<'user' | 'partner'>('user');

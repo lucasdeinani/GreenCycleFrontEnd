@@ -11,19 +11,20 @@ import {
   RefreshControl
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Leaf, Check, X, Clock, AlertTriangle, Info } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from '../context/UserContext';
 import axios from 'axios';
 import { API_BASE_URL } from '../configs'
 
 // Status map para tradução e cores
 const STATUS_MAP = {
-  "1": { label: "Pendente", color: "#FFC107", icon: Clock },
-  "2": { label: "Aprovado", color: "#2196F3", icon: Info },
-  "3": { label: "Em coleta", color: "#9C27B0", icon: Info },
-  "4": { label: "Finalizado", color: "#4CAF50", icon: Check },
-  "5": { label: "Cancelado", color: "#F44336", icon: X },
-  "6": { label: "Falha", color: "#FF5722", icon: AlertTriangle },
+  "1": { label: "Pendente", color: "#FFC107", icon: { lib: Feather, name: "clock" } },
+  "2": { label: "Aprovado", color: "#2196F3", icon: { lib: Feather, name: "info" } },
+  "3": { label: "Em coleta", color: "#9C27B0", icon: { lib: Feather, name: "info" } },
+  "4": { label: "Finalizado", color: "#4CAF50", icon: { lib: Feather, name: "check" } },
+  "5": { label: "Cancelado", color: "#F44336", icon: { lib: Feather, name: "x" } },
+  "6": { label: "Falha", color: "#FF5722", icon: { lib: Feather, name: "alert-triangle" } },
 };
 
 export default function HistoricoColetasScreen() {
@@ -163,7 +164,7 @@ export default function HistoricoColetasScreen() {
     const statusInfo = STATUS_MAP[status] || { 
       label: "Desconhecido", 
       color: "#9E9E9E", 
-      icon: Info 
+      icon: { lib: Feather, name: "info" } 
     };
     const StatusIcon = statusInfo.icon;
     
@@ -178,7 +179,7 @@ export default function HistoricoColetasScreen() {
   // Renderizar mensagem quando não há coletas
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
-      <Leaf size={60} color="#E0E0E0" />
+      <FontAwesome5 name="leaf" size={60} color="#E0E0E0" />
       <Text style={styles.emptyTitle}>Nenhuma solicitação</Text>
       <Text style={styles.emptyText}>
         Você ainda não realizou nenhuma solicitação de coleta.
@@ -216,7 +217,7 @@ export default function HistoricoColetasScreen() {
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <ArrowLeft size={24} color="#333333" />
+        <Feather name="arrow-left" size={24} color="#333333" />
         <Text style={styles.backButtonText}>Voltar</Text>
       </TouchableOpacity>
       
@@ -281,7 +282,7 @@ export default function HistoricoColetasScreen() {
       </View>
       
       <View style={styles.footer}>
-        <Leaf size={40} color="#4CAF50" />
+        <FontAwesome5 name="leaf" size={40} color="#4CAF50" />
         <Text style={styles.footerText}>Green Cycle</Text>
       </View>
       

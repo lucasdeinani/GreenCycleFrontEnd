@@ -4,7 +4,7 @@ import {
   Platform, ActivityIndicator, Alert
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Camera, Check, Edit, Lock, Save, X } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useUser } from '../context/UserContext';
 import { PasswordResetModal } from './password_reset_modal';
@@ -148,26 +148,26 @@ export default function ProfileScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <ArrowLeft size={24} color="#333333" />
+          <Feather name="arrow-left" size={24} color="#333333" />
           <Text style={styles.backButtonText}>Voltar</Text>
         </TouchableOpacity>
 
         {isEditing ? (
           <View style={styles.editActions}>
             <TouchableOpacity onPress={handleCancelEdit} disabled={isSaving}>
-              <X size={24} color="#F44336" />
+              <Feather name="x" size={24} color="#F44336" />
             </TouchableOpacity>
             <TouchableOpacity onPress={handleSaveChanges} disabled={isSaving}>
               {isSaving ? (
                 <ActivityIndicator size="small" color="#4CAF50" />
               ) : (
-                <Save size={24} color="#4CAF50" />
+                <Feather name="save" size={24} color="#4CAF50" />
               )}
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity onPress={() => setIsEditing(true)}>
-            <Edit size={24} color="#2196F3" />
+            <Feather name="edit" size={24} color="#2196F3" />
           </TouchableOpacity>
         )}
       </View>
@@ -183,7 +183,7 @@ export default function ProfileScreen() {
               style={styles.changePhotoButton}
               onPress={() => console.log('Open camera')}
             >
-              <Camera size={20} color="#FFFFFF" />
+              <Feather name="camera" size={20} color="#FFFFFF" />
             </TouchableOpacity>
           )}
         </View>
@@ -200,7 +200,7 @@ export default function ProfileScreen() {
               editable={isEditing}
               placeholder="Digite seu nome completo"
             />
-            {isEditing && <Edit size={18} color="#666" style={styles.inputIcon} />}
+            {isEditing && <Feather name="edit" size={18} color="#666" style={styles.inputIcon} />}
           {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
         </View>
 
@@ -216,7 +216,7 @@ export default function ProfileScreen() {
               editable={isEditing}
               placeholder="Digite seu email"
             />
-            {isEditing && <Edit size={18} color="#666" style={styles.inputIcon} />}
+            {isEditing && <Feather name="edit" size={18} color="#666" style={styles.inputIcon} />}
           {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
         </View>
 
@@ -229,7 +229,7 @@ export default function ProfileScreen() {
               editable={false}
               placeholder="Seu CPF"
             />
-            <Lock size={18} color="#999" style={styles.inputIcon} />
+            <Feather name="lock" size={18} color="#999" style={styles.inputIcon} />
         </View>
 
         {/* Sexo */}
@@ -269,7 +269,7 @@ export default function ProfileScreen() {
             <Text style={styles.dateText}>
               {formData.birthday.toLocaleDateString('pt-BR')}
             </Text>
-            {isEditing && <Edit size={18} color="#666" style={styles.inputIcon} />}
+            {isEditing && <Feather name="edit" size={18} color="#666" style={styles.inputIcon} />}
           </TouchableOpacity>
           {showDatePicker && isEditing && (
             <DateTimePicker
@@ -293,7 +293,7 @@ export default function ProfileScreen() {
               editable={isEditing}
               placeholder="Digite seu nome de usuário"
             />
-            {isEditing && <Edit size={18} color="#666" style={styles.inputIcon} />}
+            {isEditing && <Feather name="edit" size={18} color="#666" style={styles.inputIcon} />}
           {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
         </View>
 
@@ -303,7 +303,7 @@ export default function ProfileScreen() {
           onPress={() => setResetModalVisible(true)}
         >
           <View style={styles.resetPasswordButtonContent}>
-            <Lock size={20} color="#FFFFFF" />
+            <Feather name="lock" size={20} color="#FFFFFF" />
             <Text style={styles.resetPasswordButtonText}>Redefinir Senha</Text>
           </View>
         </TouchableOpacity>

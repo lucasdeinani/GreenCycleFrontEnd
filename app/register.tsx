@@ -11,10 +11,10 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Leaf, Check } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
-import { Eye, EyeOff } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from './context/UserContext';
 import { REGISTER_MATERIALS, API_BASE_URL } from './configs';
 
@@ -234,13 +234,13 @@ export default function RegisterScreen() {
                 onPress={() => router.back()}
                 disabled={isLoading}
             >
-                <ArrowLeft size={24} color="#4CAF50" />
+                <Feather name="arrow-left" size={24} color="#4CAF50" />
                 <Text style={styles.backButtonText}>Retorne ao Login</Text>
             </TouchableOpacity>
 
             
             <View style={styles.header}>
-                <Leaf size={40} color="#4CAF50" />
+                <FontAwesome5 name="leaf" size={40} color="#4CAF50" />
                 <Text style={styles.title}>Crie sua conta</Text>
             </View>
 
@@ -353,7 +353,7 @@ export default function RegisterScreen() {
                             formData.collectionMaterials.includes(material.nome) && styles.checkboxActive
                             ]}>
                             {formData.collectionMaterials.includes(material.nome) && (
-                                <Check size={16} color="#FFFFFF" />
+                                <Feather name="check" size={16} color="#FFFFFF" />
                             )}
                             </View>
                             <Text style={[
@@ -425,9 +425,9 @@ export default function RegisterScreen() {
                             disabled={isLoading}
                         >
                             {showPassword ? (
-                                <EyeOff size={20} color="#666" />
+                                <Feather name="eye-off" size={20} color="#666" />
                             ) : (
-                                <Eye size={20} color="#666" />
+                                <Feather name="eye" size={20} color="#666" />
                             )}
                         </TouchableOpacity>
                     </View>
@@ -451,9 +451,9 @@ export default function RegisterScreen() {
                             disabled={isLoading}
                         >
                             {showConfirmPassword ? (
-                                <EyeOff size={20} color="#666" />
+                                <Feather name="eye-off" size={20} color="#666" />
                             ) : (
-                                <Eye size={20} color="#666" />
+                                <Feather name="eye" size={20} color="#666" />
                             )}
                         </TouchableOpacity>
                     </View>

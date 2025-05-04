@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import { router } from 'expo-router';
-import { Leaf } from 'lucide-react-native';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 
 export default function SplashScreen() {
   const fadeAnim = new Animated.Value(0);
@@ -27,7 +27,7 @@ export default function SplashScreen() {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        <Leaf size={80} color="#FFFFFF" />
+        <FontAwesome5 name="leaf" size={80} color="#FFFFFF" />
       </Animated.View>
     </View>
   );

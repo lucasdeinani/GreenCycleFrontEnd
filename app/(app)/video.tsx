@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Leaf } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { WebView } from 'react-native-webview';
 
 // Example video URLs (replace with actual videos later)
@@ -30,7 +31,7 @@ export default function VideoScreen() {
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <ArrowLeft size={24} color="#333333" />
+        <Feather name="arrow-left" size={24} color="#333333" />
         <Text style={styles.backButtonText}>Voltar</Text>
       </TouchableOpacity>
 
@@ -70,7 +71,7 @@ export default function VideoScreen() {
       </Modal>
 
       <View style={styles.footer}>
-        <Leaf size={40} color="#4CAF50" />
+        <FontAwesome5 name="leaf" size={40} color="#4CAF50" />
         <Text style={styles.footerText}>Green Cycle</Text>
       </View>
     </View>

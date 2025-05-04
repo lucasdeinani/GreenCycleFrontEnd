@@ -3,7 +3,8 @@ import {
     View, Text, TextInput, TouchableOpacity, StyleSheet, 
     Pressable, Modal, Alert } from 'react-native';
 import { router } from 'expo-router';
-import { Eye, EyeOff, Leaf, X } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import axios from 'axios';
 import { useUser } from './context/UserContext';
 import { API_BASE_URL } from './configs'
@@ -98,7 +99,7 @@ export default function LoginScreen() {
     return (
         <View style={styles.container}>
             <View style={styles.logoContainer}>
-                <Leaf size={60} color="#4CAF50" />
+                <FontAwesome5 name="leaf" size={60} color="#4CAF50" />
                 <Text style={styles.title}>Green Cycle</Text>
             </View>
 
@@ -149,9 +150,9 @@ export default function LoginScreen() {
                         onPress={() => setShowPassword(!showPassword)}
                     >
                         {showPassword ? (
-                            <EyeOff size={24} color="#999" />
+                            <Feather name="eye-off" size={20} color="#666" />
                         ) : (
-                            <Eye size={24} color="#999" />
+                            <Feather name="eye" size={20} color="#666" />
                         )}
                     </Pressable>
                 </View>
@@ -195,7 +196,7 @@ export default function LoginScreen() {
                             onPress={() => setShowForgotPassword(false)}
                             disabled={isLoading}
                         >
-                            <X size={24} color="#666666" />
+                            <Feather name="x" size={24} color="#666666" />
                         </TouchableOpacity>
 
                         {!showSuccessMessage ? (

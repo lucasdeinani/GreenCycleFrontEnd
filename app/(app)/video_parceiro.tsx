@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Image, ScrollView } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Leaf, CirclePlay as PlayCircle } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { WebView } from 'react-native-webview';
+
 
 // Example video URLs with proper YouTube embed format
 const videos = [
@@ -53,7 +55,7 @@ export default function VideoParceiroScreen() {
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <ArrowLeft size={24} color="#333333" />
+        <Feather name="arrow-left" size={24} color="#333333" />
         <Text style={styles.backButtonText}>Voltar</Text>
       </TouchableOpacity>
 
@@ -74,7 +76,7 @@ export default function VideoParceiroScreen() {
                 style={styles.thumbnail}
               />
               <View style={styles.playIconOverlay}>
-                <PlayCircle size={40} color="#FFFFFF" />
+                <Feather name="play-circle" size={40} color="#FFFFFF" />
               </View>
             </View>
             <Text style={styles.videoTitle}>{video.title}</Text>
@@ -112,7 +114,7 @@ export default function VideoParceiroScreen() {
       </Modal>
 
       <View style={styles.footer}>
-        <Leaf size={40} color="#4CAF50" />
+        <FontAwesome5 name="leaf" size={40} color="#4CAF50" />
         <Text style={styles.footerText}>Green Cycle</Text>
       </View>
     </ScrollView>

@@ -1,16 +1,14 @@
 package com.rnmaps.maps;
 
+import static androidx.core.content.PermissionChecker.checkSelfPermission;
+
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Point;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.core.content.PermissionChecker;
-import androidx.core.view.GestureDetectorCompat;
-import androidx.core.view.MotionEventCompat;
+import android.location.Location;
+import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -18,8 +16,14 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
-import android.location.Location;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.content.PermissionChecker;
+import androidx.core.view.GestureDetectorCompat;
+import androidx.core.view.MotionEventCompat;
+
+import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReadableArray;
@@ -28,19 +32,22 @@ import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableNativeArray;
 import com.facebook.react.bridge.WritableNativeMap;
-import com.facebook.react.bridge.Arguments;
 import com.facebook.react.uimanager.ThemedReactContext;
-import com.facebook.react.uimanager.UIManagerModule;
+import com.facebook.react.uimanager.UIManagerHelper;
+import com.facebook.react.uimanager.common.UIManagerType;
 import com.facebook.react.uimanager.events.EventDispatcher;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMapOptions;
+import com.google.android.gms.maps.MapsInitializer;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.Projection;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.GroundOverlay;
+import com.google.android.gms.maps.model.IndoorBuilding;
+import com.google.android.gms.maps.model.IndoorLevel;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MapStyleOptions;
@@ -50,8 +57,6 @@ import com.google.android.gms.maps.model.PointOfInterest;
 import com.google.android.gms.maps.model.Polygon;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.TileOverlay;
-import com.google.android.gms.maps.model.IndoorBuilding;
-import com.google.android.gms.maps.model.IndoorLevel;
 import com.google.maps.android.collections.CircleManager;
 import com.google.maps.android.collections.GroundOverlayManager;
 import com.google.maps.android.collections.MarkerManager;
@@ -73,8 +78,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
-import static androidx.core.content.PermissionChecker.checkSelfPermission;
-
 public class MapView extends com.google.android.gms.maps.MapView implements GoogleMap.InfoWindowAdapter,
     GoogleMap.OnMarkerDragListener, OnMapReadyCallback, GoogleMap.OnPoiClickListener, GoogleMap.OnIndoorStateChangeListener {
   public GoogleMap map;
@@ -93,23 +96,26 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
   private Boolean isMapLoaded = false;
   private Integer loadingBackgroundColor = null;
   private Integer loadingIndicatorColor = null;
-  private final int baseMapPadding = 50;
 
   private LatLngBounds boundsToMove;
   private CameraUpdate cameraToSet;
+  private boolean setPaddingDeferred = false;
   private boolean showUserLocation = false;
   private boolean handlePanDrag = false;
   private boolean moveOnMarkerPress = true;
   private boolean cacheEnabled = false;
+  private boolean poiClickEnabled = true;
+
   private ReadableMap initialRegion;
-  private ReadableMap initialCamera;
   private ReadableMap region;
+  private ReadableMap initialCamera;
   private ReadableMap camera;
   private String customMapStyleString;
   private boolean initialRegionSet = false;
   private boolean initialCameraSet = false;
   private LatLngBounds cameraLastIdleBounds;
   private int cameraMoveReason = 0;
+  private MapMarker selectedMarker;
 
   private static final String[] PERMISSIONS = new String[]{
       "android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"};
@@ -170,9 +176,8 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
 
     this.manager = manager;
     this.context = reactContext;
-
+    MapsInitializer.initialize(context, this.manager.renderer, renderer -> Log.d("AirMapRenderer", renderer.toString()));
     super.onCreate(null);
-    // TODO(lmr): what about onStart????
     super.onResume();
     super.getMapAsync(this);
 
@@ -208,7 +213,14 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
       }
     });
 
-    eventDispatcher = reactContext.getNativeModule(UIManagerModule.class).getEventDispatcher();
+    int uiManagerType = UIManagerType.DEFAULT;
+    if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
+      uiManagerType = UIManagerType.FABRIC;
+    }
+
+    eventDispatcher = UIManagerHelper
+      .getUIManager(reactContext, uiManagerType)
+      .getEventDispatcher();
 
     // Set up a parent view for triggering visibility in subviews that depend on it.
     // Mainly ReactImageView depends on Fresco which depends on onVisibilityChanged() event
@@ -242,7 +254,6 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
 
     markerCollection.setInfoWindowAdapter(this);
     markerCollection.setOnMarkerDragListener(this);
-    this.map.setOnPoiClickListener(this);
     this.map.setOnIndoorStateChangeListener(this);
 
     applyBridgedProps();
@@ -286,6 +297,8 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
         event.putString("action", "marker-press");
         event.putString("id", airMapMarker.getIdentifier());
         manager.pushEvent(context, airMapMarker, "onPress", event);
+
+        handleMarkerSelection(airMapMarker);
 
         // Return false to open the callout info window and center on the marker
         // https://developers.google.com/android/reference/com/google/android/gms/maps/GoogleMap
@@ -342,6 +355,8 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
         WritableMap event = makeClickEventData(point);
         event.putString("action", "press");
         manager.pushEvent(context, view, "onPress", event);
+
+        handleMarkerSelection(null);
       }
     });
 
@@ -367,6 +382,10 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
       @Override
       public void onCameraMoveStarted(int reason) {
         cameraMoveReason = reason;
+        boolean isGesture = GoogleMap.OnCameraMoveStartedListener.REASON_GESTURE == reason;
+        WritableMap event = new WritableNativeMap();
+        event.putBoolean("isGesture", isGesture);
+        manager.pushEvent(context, view, "onRegionChangeStart", event);
       }
     });
 
@@ -454,6 +473,40 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
     context.addLifecycleEventListener(lifecycleListener);
   }
 
+  private synchronized void handleMarkerSelection(MapMarker target) {
+    if (selectedMarker == target) {
+      return;
+    }
+    
+    WritableMap event;
+
+    if (selectedMarker != null) {
+      event = makeClickEventData(selectedMarker.getPosition());
+      event.putString("action", "marker-deselect");
+      event.putString("id", selectedMarker.getIdentifier());
+      manager.pushEvent(context, selectedMarker, "onDeselect", event);
+
+      event = makeClickEventData(selectedMarker.getPosition());
+      event.putString("action", "marker-deselect");
+      event.putString("id", selectedMarker.getIdentifier());
+      manager.pushEvent(context, this, "onMarkerDeselect", event);
+    }
+
+    if (target != null) {
+      event = makeClickEventData(target.getPosition());
+      event.putString("action", "marker-select");
+      event.putString("id", target.getIdentifier());
+      manager.pushEvent(context, target, "onSelect", event);
+
+      event = makeClickEventData(target.getPosition());
+      event.putString("action", "marker-select");
+      event.putString("id", target.getIdentifier());
+      manager.pushEvent(context, this, "onMarkerSelect", event);
+    }
+
+     selectedMarker = target;
+  }
+
   private boolean hasPermissions() {
     return checkSelfPermission(getContext(), PERMISSIONS[0]) == PermissionChecker.PERMISSION_GRANTED ||
         checkSelfPermission(getContext(), PERMISSIONS[1]) == PermissionChecker.PERMISSION_GRANTED;
@@ -492,8 +545,6 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
 
   public void setInitialCamera(ReadableMap initialCamera) {
     this.initialCamera = initialCamera;
-    // Theoretically onMapReady might be called before setInitialCamera
-    // In that case, trigger moveToCamera manually
     if (!initialCameraSet && map != null) {
       moveToCamera(initialCamera);
       initialCameraSet = true;
@@ -504,17 +555,18 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
     if(initialRegion != null) {
       moveToRegion(initialRegion);
       initialRegionSet = true;
-    } else if(initialCamera != null) {
-      moveToCamera(initialCamera);
-      initialCameraSet = true;
     } else if(region != null) {
       moveToRegion(region);
-    } else {
+    } else if (initialCamera != null) {
+      moveToCamera(initialCamera);
+      initialCameraSet = true;
+    } else if (camera != null) {
       moveToCamera(camera);
     }
     if(customMapStyleString != null) {
       map.setMapStyle(new MapStyleOptions(customMapStyleString));
     }
+    this.setPoiClickEnabled(poiClickEnabled);
   }
 
   private void moveToRegion(ReadableMap region) {
@@ -554,24 +606,28 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
       moveToCamera(camera);
     }
   }
+public static CameraPosition cameraPositionFromMap(ReadableMap camera){
+  if (camera == null) return null;
 
-  public void moveToCamera(ReadableMap camera) {
+  CameraPosition.Builder builder = new CameraPosition.Builder();
+
+  ReadableMap center = camera.getMap("center");
+  if (center != null) {
+    double lng = center.getDouble("longitude");
+    double lat = center.getDouble("latitude");
+    builder.target(new LatLng(lat, lng));
+  }
+
+  builder.tilt((float)camera.getDouble("pitch"));
+  builder.bearing((float)camera.getDouble("heading"));
+  builder.zoom((float)camera.getDouble("zoom"));
+
+  return builder.build();
+}
+  public void moveToCamera(ReadableMap cameraMap) {
+    CameraPosition camera = cameraPositionFromMap(cameraMap);
     if (camera == null) return;
-
-    CameraPosition.Builder builder = new CameraPosition.Builder();
-
-    ReadableMap center = camera.getMap("center");
-    if (center != null) {
-      double lng = center.getDouble("longitude");
-      double lat = center.getDouble("latitude");
-      builder.target(new LatLng(lat, lng));
-    }
-
-    builder.tilt((float)camera.getDouble("pitch"));
-    builder.bearing((float)camera.getDouble("heading"));
-    builder.zoom((float)camera.getDouble("zoom"));
-
-    CameraUpdate update = CameraUpdateFactory.newCameraPosition(builder.build());
+    CameraUpdate update = CameraUpdateFactory.newCameraPosition(camera);
 
     if (super.getHeight() <= 0 || super.getWidth() <= 0) {
       // in this case, our map has not been laid out yet, so we save the camera update in a
@@ -627,6 +683,11 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
   public void setCacheEnabled(boolean cacheEnabled) {
     this.cacheEnabled = cacheEnabled;
     this.cacheView();
+  }
+
+  public void setPoiClickEnabled(boolean poiClickEnabled) {
+    this.poiClickEnabled = poiClickEnabled;
+    map.setOnPoiClickListener(poiClickEnabled ? this : null);
   }
 
   public void enableMapLoading(boolean loadingEnabled) {
@@ -771,6 +832,7 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
     if (feature instanceof MapMarker) {
       markerMap.remove(feature.getFeature());
       feature.removeFromMap(markerCollection);
+      attacherGroup.removeView(feature);
     } else if (feature instanceof MapHeatmap) {
       heatmapMap.remove(feature.getFeature());
       feature.removeFromMap(map);
@@ -807,6 +869,21 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
   }
 
   public void updateExtraData(Object extraData) {
+    if (setPaddingDeferred && super.getHeight() > 0 && super.getWidth() > 0) {
+      CameraUpdate cu = CameraUpdateFactory.newCameraPosition(map.getCameraPosition());
+
+      map.setPadding(edgeLeftPadding + baseLeftMapPadding,
+          edgeTopPadding + baseTopMapPadding,
+          edgeRightPadding + baseRightMapPadding,
+          edgeBottomPadding + baseBottomMapPadding);
+      map.moveCamera(cu);
+
+      // Move the google logo to the default base padding value.
+      map.setPadding(baseLeftMapPadding, baseTopMapPadding, baseRightMapPadding, baseBottomMapPadding);
+
+      setPaddingDeferred = false;
+    }
+
     // if boundsToMove is not null, we now have the MapView's width/height, so we can apply
     // a proper camera move
     if (boundsToMove != null) {
@@ -884,10 +961,10 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
     }
     if (addedPosition) {
       LatLngBounds bounds = builder.build();
-      CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, baseMapPadding);
+      CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, 0);
 
       if (edgePadding != null) {
-        map.setPadding(edgePadding.getInt("left"), edgePadding.getInt("top"),
+        appendMapPadding(edgePadding.getInt("left"), edgePadding.getInt("top"),
           edgePadding.getInt("right"), edgePadding.getInt("bottom"));
       }
 
@@ -896,6 +973,8 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
       } else {
         map.moveCamera(cu);
       }
+      // Move the google logo to the default base padding value.
+      map.setPadding(baseLeftMapPadding, baseTopMapPadding, baseRightMapPadding, baseBottomMapPadding);
     }
   }
 
@@ -926,10 +1005,10 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
 
     if (addedPosition) {
       LatLngBounds bounds = builder.build();
-      CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, baseMapPadding);
+      CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, 0);
 
       if (edgePadding != null) {
-        map.setPadding(edgePadding.getInt("left"), edgePadding.getInt("top"),
+        appendMapPadding(edgePadding.getInt("left"), edgePadding.getInt("top"),
           edgePadding.getInt("right"), edgePadding.getInt("bottom"));
       }
 
@@ -938,20 +1017,54 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
       } else {
         map.moveCamera(cu);
       }
+      // Move the google logo to the default base padding value.
+      map.setPadding(baseLeftMapPadding, baseTopMapPadding, baseRightMapPadding, baseBottomMapPadding);
     }
   }
 
+  // padding configured by 'mapPadding' property
   int baseLeftMapPadding;
   int baseRightMapPadding;
   int baseTopMapPadding;
   int baseBottomMapPadding;
+  // extra padding specified by 'edgePadding' option of fitToElements/fitToSuppliedMarkers/fitToCoordinates
+  int edgeLeftPadding;
+  int edgeRightPadding;
+  int edgeTopPadding;
+  int edgeBottomPadding;
 
   public void applyBaseMapPadding(int left, int top, int right, int bottom){
-    this.map.setPadding(left, top, right, bottom);
+    if (super.getHeight() <= 0 || super.getWidth() <= 0) {
+      // the map is not laid out yet and calling setPadding() now has no effect
+      baseLeftMapPadding = left;
+      baseRightMapPadding = right;
+      baseTopMapPadding = top;
+      baseBottomMapPadding = bottom;
+      setPaddingDeferred = true;
+      return;
+    }
+
+    // retrieve current camera with current edge paddings configured
+    map.setPadding(edgeLeftPadding + baseLeftMapPadding,
+        edgeTopPadding + baseTopMapPadding,
+        edgeRightPadding + baseRightMapPadding,
+        edgeBottomPadding + baseBottomMapPadding);
+    CameraUpdate cu = CameraUpdateFactory.newCameraPosition(map.getCameraPosition());
+
     baseLeftMapPadding = left;
     baseRightMapPadding = right;
     baseTopMapPadding = top;
     baseBottomMapPadding = bottom;
+
+    // apply base paddings and restore center position of the map
+    map.setPadding(edgeLeftPadding + left,
+        edgeTopPadding + top,
+        edgeRightPadding + right,
+        edgeBottomPadding + bottom);
+    map.moveCamera(cu);
+
+    // Move the google logo to the default base padding value.
+    map.setPadding(left, top, right, bottom);
   }
 
   public void fitToCoordinates(ReadableArray coordinatesArray, ReadableMap edgePadding,
@@ -968,7 +1081,7 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
     }
 
     LatLngBounds bounds = builder.build();
-    CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, baseMapPadding);
+    CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, 0);
 
     if (edgePadding != null) {
       appendMapPadding(edgePadding.getInt("left"), edgePadding.getInt("top"), edgePadding.getInt("right"), edgePadding.getInt("bottom"));
@@ -984,21 +1097,17 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
   }
 
   private void appendMapPadding(int iLeft,int iTop, int iRight, int iBottom) {
-    int left;
-    int top;
-    int right;
-    int bottom;
     double density = getResources().getDisplayMetrics().density;
 
-    left = (int) (iLeft * density);
-    top = (int) (iTop * density);
-    right = (int) (iRight * density);
-    bottom = (int) (iBottom * density);
+    edgeLeftPadding = (int) (iLeft * density);
+    edgeTopPadding = (int) (iTop * density);
+    edgeRightPadding = (int) (iRight * density);
+    edgeBottomPadding = (int) (iBottom * density);
 
-    map.setPadding(left + baseLeftMapPadding,
-            top + baseTopMapPadding,
-            right + baseRightMapPadding,
-            bottom + baseBottomMapPadding);
+    map.setPadding(edgeLeftPadding + baseLeftMapPadding,
+            edgeTopPadding + baseTopMapPadding,
+            edgeRightPadding + baseRightMapPadding,
+            edgeBottomPadding + baseBottomMapPadding);
   }
 
   public double[][] getMapBoundaries() {
@@ -1406,4 +1515,5 @@ public class MapView extends com.google.android.gms.maps.MapView implements Goog
       layout(getLeft(), getTop(), getRight(), getBottom());
     }
   };
+
 }

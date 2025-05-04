@@ -34,8 +34,11 @@
 @property (nonatomic, copy) RCTBubblingEventBlock onPanDrag;
 @property (nonatomic, copy) RCTBubblingEventBlock onUserLocationChange;
 @property (nonatomic, copy) RCTBubblingEventBlock onMarkerPress;
+@property (nonatomic, copy) RCTBubblingEventBlock onMarkerSelect;
+@property (nonatomic, copy) RCTBubblingEventBlock onMarkerDeselect;
 @property (nonatomic, copy) RCTBubblingEventBlock onChange;
 @property (nonatomic, copy) RCTBubblingEventBlock onPoiClick;
+@property (nonatomic, copy) RCTDirectEventBlock onRegionChangeStart;
 @property (nonatomic, copy) RCTDirectEventBlock onRegionChange;
 @property (nonatomic, copy) RCTDirectEventBlock onRegionChangeComplete;
 @property (nonatomic, copy) RCTDirectEventBlock onIndoorLevelActivated;
@@ -70,6 +73,7 @@
 - (void)didTapPolygon:(GMSPolygon *)polygon;
 - (void)didTapAtCoordinate:(CLLocationCoordinate2D)coordinate;
 - (void)didLongPressAtCoordinate:(CLLocationCoordinate2D)coordinate;
+- (void)willMove:(BOOL)gesture;
 - (void)didChangeCameraPosition:(GMSCameraPosition *)position isGesture:(BOOL)isGesture;
 - (void)idleAtCameraPosition:(GMSCameraPosition *)position isGesture:(BOOL)isGesture;
 - (void)didTapPOIWithPlaceID:(NSString *)placeID name:(NSString *) name location:(CLLocationCoordinate2D) location;
@@ -79,8 +83,7 @@
 + (GMSCameraPosition*)makeGMSCameraPositionFromMap:(GMSMapView *)map andMKCoordinateRegion:(MKCoordinateRegion)region;
 
 - (NSDictionary*) getMarkersFramesWithOnlyVisible:(BOOL)onlyVisible;
-- (instancetype) initWithMapId:(NSString *) mapId;
-
+- (instancetype)initWithMapId:(NSString *)mapId initialCamera:(GMSCameraPosition*) camera backgroundColor:(UIColor *) backgroundColor andZoomTapEnabled:(BOOL)zoomTapEnabled;
 @end
 
 #endif

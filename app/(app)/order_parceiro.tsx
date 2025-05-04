@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Leaf } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 
 // Temporary mock data with more partner-specific details
 const mockOrders = Array.from({ length: 10 }, (_, i) => ({
@@ -42,7 +43,7 @@ export default function OrderParceiroScreen() {
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <ArrowLeft size={24} color="#333333" />
+        <Feather name="arrow-left" size={24} color="#333333" />
         <Text style={styles.backButtonText}>Voltar</Text>
       </TouchableOpacity>
 
@@ -119,7 +120,7 @@ export default function OrderParceiroScreen() {
       </Modal>
 
       <View style={styles.footer}>
-        <Leaf size={40} color="#4CAF50" />
+        <FontAwesome5 name="leaf" size={40} color="#4CAF50" />
         <Text style={styles.footerText}>Green Cycle</Text>
       </View>
     </ScrollView>

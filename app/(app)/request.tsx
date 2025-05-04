@@ -11,7 +11,8 @@ import {
   Alert
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Leaf, Clock, Check } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from '../context/UserContext';
 import axios from 'axios';
 
@@ -219,7 +220,7 @@ export default function SolicitarColetaScreen() {
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <ArrowLeft size={24} color="#333333" />
+        <Feather name="arrow-left" size={24} color="#333333" />
         <Text style={styles.backButtonText}>Voltar</Text>
       </TouchableOpacity>
       
@@ -301,7 +302,7 @@ export default function SolicitarColetaScreen() {
                 </View>
                 {formData.id_enderecos === endereco.id && (
                   <View style={styles.enderecoCheckmark}>
-                    <Check size={16} color="#FFFFFF" />
+                    <Feather name="check" size={16} color="#FFFFFF" />
                   </View>
                 )}
               </TouchableOpacity>
@@ -331,7 +332,7 @@ export default function SolicitarColetaScreen() {
       </View>
       
       <View style={styles.footer}>
-        <Leaf size={40} color="#4CAF50" />
+        <FontAwesome5 name="leaf" size={40} color="#4CAF50" />
         <Text style={styles.footerText}>Green Cycle</Text>
       </View>
       
@@ -376,7 +377,7 @@ export default function SolicitarColetaScreen() {
             <View style={styles.countdownContainer}>
               {countdownValue > 0 ? (
                 <>
-                  <Clock size={24} color="#666666" />
+                  <Feather name="clock" size={24} color="#666666" />
                   <Text style={styles.countdownText}>
                     Aguarde {countdownValue} segundos para confirmar
                   </Text>

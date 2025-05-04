@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Modal, StyleSheet, Alert
 } from 'react-native';
-import { Check, X, Settings, Eye, EyeOff } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 
 interface PasswordResetModalProps {
   visible: boolean;
@@ -86,11 +86,11 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
             onClose();
             resetForm();
           }}>
-            <X size={24} color="#666" />
+            <Feather name="x" size={24} color="#666" />
           </TouchableOpacity>
 
           <View style={styles.header}>
-            <Settings size={32} color="#4CAF50" />
+            <Feather name="settings" size={32} color="#4CAF50" />
             <Text style={styles.title}>Redefinir Senha</Text>
           </View>
 
@@ -110,9 +110,9 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                   onPress={() => setShowCurrentPassword(!showCurrentPassword)}
                 >
                   {showCurrentPassword ? (
-                    <EyeOff size={20} color="#666" />
+                    <Feather name="eye-off" size={20} color="#666" />
                   ) : (
-                    <Eye size={20} color="#666" />
+                    <Feather name="eye" size={20} color="#666" />
                   )}
                 </TouchableOpacity>
               </View>
@@ -143,9 +143,9 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                   onPress={() => setShowNewPassword(!showNewPassword)}
                 >
                   {showNewPassword ? (
-                    <EyeOff size={20} color="#666" />
+                    <Feather name="eye-off" size={20} color="#666" />
                   ) : (
-                    <Eye size={20} color="#666" />
+                    <Feather name="eye" size={20} color="#666" />
                   )}
                 </TouchableOpacity>
               </View>
@@ -164,9 +164,9 @@ export const PasswordResetModal: React.FC<PasswordResetModalProps> = ({
                   onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                 >
                   {showConfirmPassword ? (
-                    <EyeOff size={20} color="#666" />
+                    <Feather name="eye-off" size={20} color="#666" />
                   ) : (
-                    <Eye size={20} color="#666" />
+                    <Feather name="eye" size={20} color="#666" />
                   )}
                 </TouchableOpacity>
               </View>

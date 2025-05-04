@@ -1,6 +1,7 @@
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
-import { MapPin, Package, Video, LogOut, Leaf, User } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from '../context/UserContext';
 
 export default function MenuScreen() {
@@ -26,7 +27,7 @@ export default function MenuScreen() {
             style={styles.menuButton}
             onPress={() => router.push('/order')}
           >
-            <Package size={24} color="#FFFFFF" />
+            <Feather name="package" size={24} color="#FFFFFF" />
             <Text style={styles.menuButtonText}>Pedido</Text>
           </TouchableOpacity>
 
@@ -34,7 +35,7 @@ export default function MenuScreen() {
             style={styles.menuButton}
             onPress={() => router.push('/map')}
           >
-            <MapPin size={24} color="#FFFFFF" />
+            <Feather name="map-pin" size={24} color="#FFFFFF" />
             <Text style={styles.menuButtonText}>Mapa</Text>
           </TouchableOpacity>
 
@@ -42,7 +43,7 @@ export default function MenuScreen() {
             style={styles.menuButton}
             onPress={() => router.push('/video')}
           >
-            <Video size={24} color="#FFFFFF" />
+            <Feather name="video" size={24} color="#FFFFFF" />
             <Text style={styles.menuButtonText}>Video</Text>
           </TouchableOpacity>
 
@@ -50,7 +51,7 @@ export default function MenuScreen() {
             style={styles.menuButton}
             onPress={() => router.push('/profile')}
           >
-            <User size={24} color="#FFFFFF" />
+            <Feather name="user" size={24} color="#FFFFFF" />
             <Text style={styles.menuButtonText}>Perfil</Text>
           </TouchableOpacity>
 
@@ -58,13 +59,13 @@ export default function MenuScreen() {
             style={styles.menuButton}
             onPress={handleLogout}
           >
-            <LogOut size={24} color="#FFFFFF" />
+            <Feather name="log-out" size={24} color="#FFFFFF" />
             <Text style={styles.menuButtonText}>Sair</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
-          <Leaf size={40} color="#4CAF50" />
+          <FontAwesome5 name="leaf" size={40} color="#4CAF50" />
           <Text style={styles.footerText}>Green Cycle</Text>
         </View>
       </View>

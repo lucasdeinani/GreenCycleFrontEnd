@@ -11,7 +11,9 @@ import {
   Platform
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Leaf, X, Info, LocateFixed, Navigation } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Location from 'expo-location';
 import MapView, { Marker, MapViewProps } from 'react-native-maps';
 import { fetchPontosColeta, fetchMateriais } from '../services/api';
@@ -336,7 +338,7 @@ export default function MapScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <ArrowLeft size={24} color="#333333" />
+          <Feather name="arrow-left" size={24} color="#333333" />
           <Text style={styles.backButtonText}>Voltar</Text>
         </TouchableOpacity>
       </View>
@@ -400,7 +402,7 @@ export default function MapScreen() {
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <ArrowLeft size={24} color="#333333" />
+        <Feather name="arrow-left" size={24} color="#333333" />
         <Text style={styles.backButtonText}>Voltar</Text>
       </TouchableOpacity>
 
@@ -440,7 +442,7 @@ export default function MapScreen() {
           style={styles.centralizarButton}
           onPress={centralizarNoMapa}
         >
-          <LocateFixed size={24} color="#333333" />
+          <Ionicons name="locate-outline" size={24} color="#333333" />
         </TouchableOpacity>
       </View>
 
@@ -472,7 +474,7 @@ export default function MapScreen() {
                   {formatarDistancia(ponto.distancia)}
                 </Text>
               )}
-              <Info size={24} color="#4CAF50" />
+              <Feather name="info" size={24} color="#4CAF50" />
             </TouchableOpacity>
           ))
         )}
@@ -495,7 +497,7 @@ export default function MapScreen() {
                 onPress={() => setModalVisible(false)}
                 style={styles.closeButton}
               >
-                <X size={24} color="#333333" />
+                <Feather name="x" size={24} color="#333333" />
               </TouchableOpacity>
             </View>
 
@@ -507,7 +509,7 @@ export default function MapScreen() {
                   onPress={() => abrirMenuNavegacao(pontoSelecionado)}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Navigation size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <Feather name="navigation" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
                     <Text style={styles.navegarButtonText}>Navegar até o local</Text>
                   </View>
                 </TouchableOpacity>
@@ -550,7 +552,7 @@ export default function MapScreen() {
       </Modal>
 
       <View style={styles.footer}>
-        <Leaf size={40} color="#4CAF50" />
+        <FontAwesome5 name="leaf" size={40} color="#4CAF50" />
         <Text style={styles.footerText}>Green Cycle</Text>
       </View>
     </ScrollView>

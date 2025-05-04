@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useFonts, Roboto_400Regular, Roboto_500Medium, Roboto_700Bold } from '@expo-google-fonts/roboto';
+import { 
+  useFonts, Roboto_400Regular, Roboto_500Medium, Roboto_700Bold 
+} from '@expo-google-fonts/roboto';
 import { SplashScreen } from 'expo-router';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { useContext } from 'react';
 import React from 'react';
 import { UserProvider } from './context/UserContext';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet'; 

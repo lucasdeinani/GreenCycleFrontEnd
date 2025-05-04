@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Camera, Check, Edit, Lock, Save, X } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import { useUser } from '../context/UserContext';
 import { PasswordResetModal } from './password_reset_modal';
 import { REGISTER_MATERIALS } from '../configs';
@@ -167,26 +168,26 @@ export default function ProfileParceiroScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <ArrowLeft size={24} color="#333333" />
+          <Feather name="arrow-left" size={24} color="#333333" />
           <Text style={styles.backButtonText}>Voltar</Text>
         </TouchableOpacity>
 
         {isEditing ? (
           <View style={styles.editActions}>
             <TouchableOpacity onPress={handleCancelEdit} disabled={isSaving}>
-              <X size={24} color="#F44336" />
+              <Feather name="x" size={24} color="#F44336" />
             </TouchableOpacity>
             <TouchableOpacity onPress={handleSaveChanges} disabled={isSaving}>
               {isSaving ? (
                 <ActivityIndicator size="small" color="#4CAF50" />
               ) : (
-                <Save size={24} color="#4CAF50" />
+                <Feather name="save" size={24} color="#4CAF50" />
               )}
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity onPress={() => setIsEditing(true)}>
-            <Edit size={24} color="#2196F3" />
+            <Feather name="edit" size={24} color="#2196F3" />
           </TouchableOpacity>
         )}
       </View>
@@ -202,7 +203,7 @@ export default function ProfileParceiroScreen() {
               style={styles.changePhotoButton}
               onPress={() => console.log('Open camera')}
             >
-              <Camera size={20} color="#FFFFFF" />
+              <Feather name="camera" size={20} color="#FFFFFF" />
             </TouchableOpacity>
           )}
         </View>
@@ -219,7 +220,7 @@ export default function ProfileParceiroScreen() {
               editable={isEditing}
               placeholder="Nome da sua empresa"
             />
-            {isEditing && <Edit size={18} color="#666" style={styles.inputIcon} />}
+            {isEditing && <Feather name="edit" size={18} color="#666" style={styles.inputIcon} />}
           {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
         </View>
 
@@ -235,7 +236,7 @@ export default function ProfileParceiroScreen() {
               editable={isEditing}
               placeholder="Email da empresa"
             />
-            {isEditing && <Edit size={18} color="#666" style={styles.inputIcon} />}
+            {isEditing && <Feather name="edit" size={18} color="#666" style={styles.inputIcon} />}
           {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
         </View>
 
@@ -248,7 +249,7 @@ export default function ProfileParceiroScreen() {
               editable={false}
               placeholder="CNPJ da empresa"
             />
-            <Lock size={18} color="#999" style={styles.inputIcon} />
+            <Feather name="lock" size={18} color="#999" style={styles.inputIcon} />
         </View>
 
         {/* Usuário */}
@@ -262,7 +263,7 @@ export default function ProfileParceiroScreen() {
               editable={isEditing}
               placeholder="Nome de usuário"
             />
-            {isEditing && <Edit size={18} color="#666" style={styles.inputIcon} />}
+            {isEditing && <Feather name="edit" size={18} color="#666" style={styles.inputIcon} />}
           {errors.username && <Text style={styles.errorText}>{errors.username}</Text>}
         </View>
 
@@ -272,7 +273,7 @@ export default function ProfileParceiroScreen() {
           onPress={() => setResetModalVisible(true)}
         >
           <View style={styles.resetPasswordButtonContent}>
-            <Lock size={20} color="#FFFFFF" />
+            <Feather name="lock" size={20} color="#FFFFFF" />
             <Text style={styles.resetPasswordButtonText}>Redefinir Senha</Text>
           </View>
         </TouchableOpacity>
@@ -304,7 +305,7 @@ export default function ProfileParceiroScreen() {
                     isMaterialSelected(material.nome) && styles.checkboxActive
                   ]}>
                     {isMaterialSelected(material.nome) && (
-                      <Check size={16} color="#FFFFFF" />
+                      <Feather name="check" size={16} color="#FFFFFF" />
                     )}
                   </View>
                   <Text style={[

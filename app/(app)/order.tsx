@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Leaf, ClipboardList, Plus } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from '../context/UserContext';
 
 export default function OrderScreen() {
@@ -13,7 +15,7 @@ export default function OrderScreen() {
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <ArrowLeft size={24} color="#333333" />
+        <Feather name="arrow-left" size={24} color="#333333" />
         <Text style={styles.backButtonText}>Voltar</Text>
       </TouchableOpacity>
 
@@ -28,7 +30,7 @@ export default function OrderScreen() {
           onPress={() => router.push('/request')}
         >
           <View style={styles.optionIconContainer}>
-            <Plus size={32} color="#FFFFFF" />
+            <Feather name="plus" size={32} color="#FFFFFF" />
           </View>
           <View style={styles.optionTextContainer}>
             <Text style={styles.optionTitle}>Nova Solicitação</Text>
@@ -43,7 +45,7 @@ export default function OrderScreen() {
           onPress={() => router.push('/historicRequest')}
         >
           <View style={[styles.optionIconContainer, { backgroundColor: '#2196F3' }]}>
-            <ClipboardList size={32} color="#FFFFFF" />
+            <FontAwesome5 name="clipboard-list" size={32} color="#FFFFFF" />
           </View>
           <View style={styles.optionTextContainer}>
             <Text style={styles.optionTitle}>Histórico</Text>
@@ -67,7 +69,7 @@ export default function OrderScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Leaf size={40} color="#4CAF50" />
+        <FontAwesome5 name="leaf" size={40} color="#4CAF50" />
         <Text style={styles.footerText}>Green Cycle</Text>
       </View>
     </ScrollView>

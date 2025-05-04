@@ -1,20 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Leaf, MapPin } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import * as Location from 'expo-location';
-
-// Platform-specific map imports
-let MapView, Marker;
-if (Platform.OS !== 'web') {
-  try {
-    const RNMaps = require('react-native-maps');
-    MapView = RNMaps.default;
-    Marker = RNMaps.Marker;
-  } catch (err) {
-    console.warn('react-native-maps failed to load:', err);
-  }
-}
+import MapView, { Marker, MapViewProps } from 'react-native-maps';
 
 // Mock collection points data
 const collectionPoints = [
@@ -58,14 +48,14 @@ export default function MapParceiroScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <ArrowLeft size={24} color="#333333" />
+          <Feather name="arrow-left" size={24} color="#333333" />
           <Text style={styles.backButtonText}>Voltar</Text>
         </TouchableOpacity>
 
         <View style={styles.header}>
           <Text style={styles.title}>Pontos de Coleta</Text>
           <TouchableOpacity style={styles.addButton}>
-            <MapPin size={24} color="#FFFFFF" />
+            <Feather name="map-pin" size={24} color="#FFFFFF" />
             <Text style={styles.addButtonText}>Adicionar Ponto</Text>
           </TouchableOpacity>
         </View>
@@ -95,7 +85,7 @@ export default function MapParceiroScreen() {
         )}
 
         <View style={styles.footer}>
-          <Leaf size={40} color="#4CAF50" />
+          <FontAwesome5 name="leaf" size={40} color="#4CAF50" />
           <Text style={styles.footerText}>Green Cycle</Text>
         </View>
       </ScrollView>
@@ -108,14 +98,14 @@ export default function MapParceiroScreen() {
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <ArrowLeft size={24} color="#333333" />
+        <Feather name="arrow-left" size={24} color="#333333" />
         <Text style={styles.backButtonText}>Voltar</Text>
       </TouchableOpacity>
 
       <View style={styles.header}>
         <Text style={styles.title}>Pontos de Coleta</Text>
         <TouchableOpacity style={styles.addButton}>
-          <MapPin size={24} color="#FFFFFF" />
+          <Feather name="map-pin" size={24} color="#FFFFFF" />
           <Text style={styles.addButtonText}>Adicionar Ponto</Text>
         </TouchableOpacity>
       </View>
@@ -168,7 +158,7 @@ export default function MapParceiroScreen() {
       )}
 
       <View style={styles.footer}>
-        <Leaf size={40} color="#4CAF50" />
+        <FontAwesome5 name="leaf" size={40} color="#4CAF50" />
         <Text style={styles.footerText}>Green Cycle</Text>
       </View>
     </ScrollView>

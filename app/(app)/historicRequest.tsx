@@ -15,6 +15,8 @@ import { Feather } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from '../context/UserContext';
 import axios from 'axios';
+
+// URL base da API
 import { API_BASE_URL } from '../configs'
 
 // Status map para tradução e cores
@@ -38,37 +40,58 @@ export default function HistoricoColetasScreen() {
   
   const fetchColetas = async () => {
     try {
+      if (!user?.id) {
+        console.warn('ID do usuário não encontrado');
+        setIsLoading(false);
+        return;
+      }
+
       // Buscando coletas do cliente
       const response = await axios.get(`${API_BASE_URL}/coletas?id_clientes=${user.id}`);
       
       // Para cada coleta, buscar os detalhes relacionados
       const coletasDetalhadas = await Promise.all(
         response.data.map(async (coleta) => {
-          // Buscar material
-          const materialResponse = await axios.get(`${API_BASE_URL}/materiais/${coleta.id_materiais}`);
-          
-          // Buscar solicitação
-          const solicitacaoResponse = await axios.get(`${API_BASE_URL}/solicitacoes/${coleta.id_solicitacoes}`);
-          
-          // Buscar endereço
-          const enderecoResponse = await axios.get(`${API_BASE_URL}/enderecos/${coleta.id_enderecos}`);
-          
-          // Buscar pagamento
-          const pagamentoResponse = await axios.get(`${API_BASE_URL}/pagamentos/${coleta.id_pagamentos}`);
-          
-          // Combinar todos os dados
-          return {
-            ...coleta,
-            material: materialResponse.data,
-            solicitacao: solicitacaoResponse.data,
-            endereco: enderecoResponse.data,
-            pagamento: pagamentoResponse.data,
-          };
+          try {
+            // Validação básica dos dados da coleta
+            if (!coleta || !coleta.id_materiais || !coleta.id_solicitacoes) {
+              console.warn('Dados de coleta inválidos:', coleta);
+              return null;
+            }
+
+            // Buscar material
+            const materialResponse = await axios.get(`${API_BASE_URL}/materiais/${coleta.id_materiais}`);
+            
+            // Buscar solicitação
+            const solicitacaoResponse = await axios.get(`${API_BASE_URL}/solicitacoes/${coleta.id_solicitacoes}`);
+            
+            // Buscar endereço
+            const enderecoResponse = await axios.get(`${API_BASE_URL}/enderecos/${coleta.id_enderecos}`);
+            
+            // Buscar pagamento
+            const pagamentoResponse = await axios.get(`${API_BASE_URL}/pagamentos/${coleta.id_pagamentos}`);
+            
+            // Combinar todos os dados
+            return {
+              ...coleta,
+              material: materialResponse.data || {},
+              solicitacao: solicitacaoResponse.data || {},
+              endereco: enderecoResponse.data || {},
+              pagamento: pagamentoResponse.data || {},
+            };
+          } catch (itemError) {
+            console.error('Erro ao buscar detalhes de coleta individual:', itemError);
+            return null;
+          }
         })
       );
       
+      // Filtrar coletas nulas
+      const coletasValidas = coletasDetalhadas.filter(coleta => coleta !== null);
+      
       // Ordenar primeiro por prioridade de status, depois por data de criação
       const getPrioridade = (status) => {
+        if (!status) return 99;
         const prioridades = {
           "3": 1, // Em coleta (maior prioridade)
           "1": 2, // Pendente
@@ -77,26 +100,30 @@ export default function HistoricoColetasScreen() {
           "4": 5, // Finalizado
           "5": 6, // Cancelado (menor prioridade)
         };
-        return prioridades[status] || 99; // Status desconhecidos ficam por último
+        return prioridades[status] || 99;
       };
       
-      const coletasOrdenadas = coletasDetalhadas.sort((a, b) => {
+      const coletasOrdenadas = coletasValidas.sort((a, b) => {
         // Primeiro ordenar por prioridade de status
-        const prioridadeA = getPrioridade(a.solicitacao.estado_solicitacao);
-        const prioridadeB = getPrioridade(b.solicitacao.estado_solicitacao);
+        const statusA = a.solicitacao?.estado_solicitacao;
+        const statusB = b.solicitacao?.estado_solicitacao;
+        const prioridadeA = getPrioridade(statusA);
+        const prioridadeB = getPrioridade(statusB);
         
         if (prioridadeA !== prioridadeB) {
           return prioridadeA - prioridadeB;
         }
         
         // Se o status for o mesmo, ordenar por data (mais recente primeiro)
-        return new Date(b.criado_em) - new Date(a.criado_em);
+        const dataA = new Date(a.criado_em || 0);
+        const dataB = new Date(b.criado_em || 0);
+        return dataB - dataA;
       });
       
       setColetas(coletasOrdenadas);
     } catch (error) {
-      // console.error('Erro ao buscar coletas:', error);
-      Alert.alert('Erro', 'Não foi possível carregar seu histórico de coletas.');
+      console.error('Erro ao buscar coletas:', error.response?.data || error.message);
+      Alert.alert('Erro', 'Não foi possível carregar seu histórico de coletas. Verifique sua conexão e tente novamente.');
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -104,8 +131,36 @@ export default function HistoricoColetasScreen() {
   };
 
   useEffect(() => {
-    fetchColetas();
-  }, [user]);
+    const loadColetas = async () => {
+      // Verifica se o usuário está disponível
+      if (!user?.id) {
+        console.warn('Usuário não disponível ainda');
+        setIsLoading(false); // Importante: não manter em loading se não tem usuário
+        return;
+      }
+  
+      console.log('Carregando coletas para user.id =', user.id);
+  
+      setIsLoading(true);
+  
+      try {
+        await fetchColetas();
+      } catch (error) {
+        console.error('Erro inesperado no loadColetas:', error);
+        setIsLoading(false); // Garante que o loading é desativado em caso de erro
+        Alert.alert('Erro', 'Não foi possível carregar as coletas. Tente novamente.');
+      }
+    };
+  
+    // Adiciona um timeout de segurança
+    const timeoutId = setTimeout(() => {
+      loadColetas();
+    }, 0);
+  
+    // Limpeza do timeout se o componente desmontar
+    return () => clearTimeout(timeoutId);
+  }, [user?.id]);  // Corrigido para user?.id
+
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -113,12 +168,13 @@ export default function HistoricoColetasScreen() {
   };
 
   const handleColetaPress = (coleta) => {
+    if (!coleta) return;
     setSelectedColeta(coleta);
     setModalVisible(true);
   };
 
   const handleCancelarColeta = async () => {
-    if (!selectedColeta) return;
+    if (!selectedColeta || !selectedColeta.solicitacao) return;
     
     // Verificar se a solicitação está pendente
     if (selectedColeta.solicitacao.estado_solicitacao !== "1") {
@@ -147,7 +203,7 @@ export default function HistoricoColetasScreen() {
       
       Alert.alert('Sucesso', 'Sua solicitação foi cancelada com sucesso.');
     } catch (error) {
-      console.error('Erro ao cancelar solicitação:', error);
+      console.error('Erro ao cancelar solicitação:', error.response?.data || error.message);
       Alert.alert('Erro', 'Não foi possível cancelar sua solicitação. Tente novamente.');
     } finally {
       setCancelLoading(false);
@@ -155,16 +211,22 @@ export default function HistoricoColetasScreen() {
   };
 
   const formatarData = (dataString) => {
-    const data = new Date(dataString);
-    return data.toLocaleDateString('pt-BR') + ' às ' + 
-           data.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+    if (!dataString) return 'Data não disponível';
+    try {
+      const data = new Date(dataString);
+      return data.toLocaleDateString('pt-BR') + ' às ' + 
+             data.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+    } catch (error) {
+      console.error('Erro ao formatar data:', error);
+      return 'Data inválida';
+    }
   };
   
   const renderStatusBadge = (status) => {
     const statusInfo = STATUS_MAP[status] || { 
       label: "Desconhecido", 
       color: "#9E9E9E", 
-      icon: { lib: Feather, name: "info" } 
+      icon: Info 
     };
     const StatusIcon = statusInfo.icon;
     
@@ -241,18 +303,18 @@ export default function HistoricoColetasScreen() {
               >
                 <View style={styles.coletaHeader}>
                   <Text style={styles.coletaId}>Pedido #{coleta.id}</Text>
-                  {renderStatusBadge(coleta.solicitacao.estado_solicitacao)}
+                  {renderStatusBadge(coleta.solicitacao?.estado_solicitacao)}
                 </View>
                 
                 <View style={styles.coletaInfo}>
                   <Text style={styles.coletaInfoLabel}>Material:</Text>
-                  <Text style={styles.coletaInfoValue}>{coleta.material.nome}</Text>
+                  <Text style={styles.coletaInfoValue}>{coleta.material?.nome || 'Material não especificado'}</Text>
                 </View>
                 
                 <View style={styles.coletaInfo}>
                   <Text style={styles.coletaInfoLabel}>Quantidade:</Text>
                   <Text style={styles.coletaInfoValue}>
-                    {parseFloat(coleta.peso_material).toFixed(2)} kg ({coleta.quantidade_material} itens)
+                    {parseFloat(coleta.peso_material || 0).toFixed(2)} kg ({coleta.quantidade_material || 0} itens)
                   </Text>
                 </View>
                 
@@ -265,7 +327,7 @@ export default function HistoricoColetasScreen() {
                 
                 <View style={styles.coletaFooter}>
                   <Text style={styles.coletaValor}>
-                    Valor estimado: R$ {(parseFloat(coleta.peso_material) * parseFloat(coleta.material.preco || 1)).toFixed(2)}
+                    Valor estimado: R$ {(parseFloat(coleta.peso_material || 0) * parseFloat(coleta.material?.preco || 1)).toFixed(2)}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -273,7 +335,7 @@ export default function HistoricoColetasScreen() {
             
             <TouchableOpacity 
               style={styles.newButton}
-              onPress={() => router.push('/(app)/solicitar-coleta')}
+              onPress={() => router.push('/(app)/request')} 
             >
               <Text style={styles.newButtonText}>Nova Solicitação</Text>
             </TouchableOpacity>
@@ -301,7 +363,7 @@ export default function HistoricoColetasScreen() {
                 style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
               >
-                <X size={24} color="#666666" />
+                <Feather name="x" size={24} color="#666666" />
               </TouchableOpacity>
             </View>
             
@@ -316,7 +378,7 @@ export default function HistoricoColetasScreen() {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Status:</Text>
                     <View style={styles.detailValue}>
-                      {renderStatusBadge(selectedColeta.solicitacao.estado_solicitacao)}
+                      {renderStatusBadge(selectedColeta.solicitacao?.estado_solicitacao)}
                     </View>
                   </View>
                   <View style={styles.detailRow}>
@@ -331,30 +393,30 @@ export default function HistoricoColetasScreen() {
                   <Text style={styles.modalSectionTitle}>Material</Text>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Tipo:</Text>
-                    <Text style={styles.detailValue}>{selectedColeta.material.nome}</Text>
+                    <Text style={styles.detailValue}>{selectedColeta.material?.nome || 'Não especificado'}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Peso:</Text>
                     <Text style={styles.detailValue}>
-                      {parseFloat(selectedColeta.peso_material).toFixed(2)} kg
+                      {parseFloat(selectedColeta.peso_material || 0).toFixed(2)} kg
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Quantidade:</Text>
                     <Text style={styles.detailValue}>
-                      {selectedColeta.quantidade_material} itens
+                      {selectedColeta.quantidade_material || 0} itens
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Preço/kg:</Text>
                     <Text style={styles.detailValue}>
-                      R$ {parseFloat(selectedColeta.material.preco || 1).toFixed(2)}
+                      R$ {parseFloat(selectedColeta.material?.preco || 1).toFixed(2)}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Valor total:</Text>
                     <Text style={[styles.detailValue, styles.valorTotal]}>
-                      R$ {(parseFloat(selectedColeta.peso_material) * parseFloat(selectedColeta.material.preco || 1)).toFixed(2)}
+                      R$ {(parseFloat(selectedColeta.peso_material || 0) * parseFloat(selectedColeta.material?.preco || 1)).toFixed(2)}
                     </Text>
                   </View>
                 </View>
@@ -362,14 +424,14 @@ export default function HistoricoColetasScreen() {
                 <View style={styles.modalSection}>
                   <Text style={styles.modalSectionTitle}>Endereço de Coleta</Text>
                   <Text style={styles.enderecoText}>
-                    {selectedColeta.endereco.rua}, {selectedColeta.endereco.numero || 'S/N'}{'\n'}
-                    {selectedColeta.endereco.bairro}{'\n'}
-                    {selectedColeta.endereco.cidade} - {selectedColeta.endereco.estado}{'\n'}
-                    CEP: {selectedColeta.endereco.cep}
+                    {selectedColeta.endereco?.rua || 'Endereço não disponível'}, {selectedColeta.endereco?.numero || 'S/N'}{'\n'}
+                    {selectedColeta.endereco?.bairro || ''}{'\n'}
+                    {selectedColeta.endereco?.cidade || ''} - {selectedColeta.endereco?.estado || ''}{'\n'}
+                    CEP: {selectedColeta.endereco?.cep || 'Não informado'}
                   </Text>
                 </View>
                 
-                {selectedColeta.solicitacao.observacoes && (
+                {selectedColeta.solicitacao?.observacoes && (
                   <View style={styles.modalSection}>
                     <Text style={styles.modalSectionTitle}>Observações</Text>
                     <Text style={styles.observacoesText}>
@@ -378,7 +440,7 @@ export default function HistoricoColetasScreen() {
                   </View>
                 )}
                 
-                {selectedColeta.solicitacao.estado_solicitacao === "1" && (
+                {selectedColeta.solicitacao?.estado_solicitacao === "1" && (
                   <TouchableOpacity 
                     style={styles.cancelButton}
                     onPress={handleCancelarColeta}

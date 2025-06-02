@@ -17,7 +17,7 @@ import { useUser } from '../context/UserContext';
 import axios from 'axios';
 
 // URL base da API
-const API_BASE_URL = 'http://192.168.0.86:8000/v1';
+const API_BASE_URL = 'http://192.168.0.103:8000/v1';
 
 export default function SolicitarColetaScreen() {
   const { user } = useUser();
@@ -127,10 +127,10 @@ export default function SolicitarColetaScreen() {
       return;
     }
     
-    if (!formData.id_enderecos) {
-      Alert.alert('Erro', 'Por favor, selecione um endereço para coleta.');
-      return;
-    }
+    // if (!formData.id_enderecos) {
+    //   Alert.alert('Erro', 'Por favor, selecione um endereço para coleta.');
+    //   return;
+    // }
 
     setConfirmVisible(true);
     setIsCountdownActive(true);
@@ -139,58 +139,61 @@ export default function SolicitarColetaScreen() {
   const handleSubmit = async () => {
     setIsSending(true);
     
-    try {
-      // 1. Criar pagamento
-      const pagamentoResponse = await axios.post(`${API_BASE_URL}/pagamentos`, {
-        valor_pagamento: 0,
-        saldo_pagamento: 0,
-        estado_pagamento: "1" // Pendente
-      });
+    // try {
+    //   // 1. Criar pagamento
+    //   const pagamentoResponse = await axios.post(`${API_BASE_URL}/pagamentos`, {
+    //     valor_pagamento: 0,
+    //     saldo_pagamento: 0,
+    //     estado_pagamento: "1" // Pendente
+    //   });
 
-      // 2. Criar solicitação
-      const solicitacaoResponse = await axios.post(`${API_BASE_URL}/solicitacoes`, {
-        estado_solicitacao: "1", // Pendente
-        observacoes: formData.observacoes || null,
-        latitude: 0, // Seria obtido do endereço ou GPS
-        longitude: 0 // Seria obtido do endereço ou GPS
-      });
+    //   // 2. Criar solicitação
+    //   const solicitacaoResponse = await axios.post(`${API_BASE_URL}/solicitacoes`, {
+    //     estado_solicitacao: "1", // Pendente
+    //     observacoes: formData.observacoes || null,
+    //     latitude: 0, // Seria obtido do endereço ou GPS
+    //     longitude: 0 // Seria obtido do endereço ou GPS
+    //   });
 
-      // 3. Criar coleta
-      await axios.post(`${API_BASE_URL}/coletas`, {
-        id_clientes: user.id,
-        id_parceiros: null, // Será atribuído posteriormente
-        id_materiais: formData.id_materiais,
-        peso_material: formData.peso_material,
-        quantidade_material: formData.quantidade_material,
-        id_enderecos: formData.id_enderecos,
-        id_solicitacoes: solicitacaoResponse.data.id,
-        id_pagamentos: pagamentoResponse.data.id
-      });
+    //   // 3. Criar coleta
+    //   await axios.post(`${API_BASE_URL}/coletas`, {
+    //     id_clientes: user.id,
+    //     id_parceiros: null, // Será atribuído posteriormente
+    //     id_materiais: formData.id_materiais,
+    //     peso_material: formData.peso_material,
+    //     quantidade_material: formData.quantidade_material,
+    //     id_enderecos: formData.id_enderecos,
+    //     id_solicitacoes: solicitacaoResponse.data.id,
+    //     id_pagamentos: pagamentoResponse.data.id
+    //   });
 
-      // Limpar formulário e fechar modal
-      setFormData({
-        id_materiais: '',
-        peso_material: '',
-        quantidade_material: '1',
-        id_enderecos: '',
-        observacoes: ''
-      });
+    //   // Limpar formulário e fechar modal
+    //   setFormData({
+    //     id_materiais: '',
+    //     peso_material: '',
+    //     quantidade_material: '1',
+    //     id_enderecos: '',
+    //     observacoes: ''
+    //   });
       
-      setConfirmVisible(false);
+    //   setConfirmVisible(false);
       
-      // Mostrar mensagem de sucesso
-      Alert.alert(
-        'Solicitação Enviada',
-        'Sua solicitação de coleta foi registrada com sucesso!',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
+    //   // Mostrar mensagem de sucesso
+    //   Alert.alert(
+    //     'Solicitação Enviada',
+    //     'Sua solicitação de coleta foi registrada com sucesso!',
+    //     [{ text: 'OK', onPress: () => router.back() }]
+    //   );
       
-    } catch (error) {
-      console.error('Erro ao enviar solicitação:', error);
-      Alert.alert('Erro', 'Não foi possível enviar sua solicitação de coleta. Tente novamente.');
-    } finally {
-      setIsSending(false);
-    }
+    // } catch (error) {
+    //   console.error('Erro ao enviar solicitação:', error);
+    //   Alert.alert('Erro', 'Não foi possível enviar sua solicitação de coleta. Tente novamente.');
+    // } finally {
+    //   setIsSending(false);
+    // }
+
+    Alert.alert('Erro', 'Não foi possível enviar sua solicitação de coleta. Tente novamente.');
+    setIsSending(false);
   };
 
   const getMaterialNome = (id) => {

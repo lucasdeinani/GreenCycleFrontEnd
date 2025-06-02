@@ -1,41 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
+import { useUser } from '../context/UserContext';
 
-// Temporary mock data with more partner-specific details
-const mockOrders = Array.from({ length: 10 }, (_, i) => ({
-  id: i + 1,
-  orderNumber: `Pedido ${i + 1}`,
-  details: `Detalhes do pedido ${i + 1}`,
-  status: ['Pendente', 'Em Coleta', 'Finalizado'][Math.floor(Math.random() * 3)],
-  type: ['Metais', 'Papeis', 'Plastico', 'Residuo Organico', 'Residuo Hospitalar'][Math.floor(Math.random() * 5)],
-  address: `Rua ${i + 1}, Bairro ${i + 1}`,
-  scheduledDate: new Date(Date.now() + Math.random() * 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-}));
-
-export default function OrderParceiroScreen() {
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
-
-  const handleOrderPress = (order) => {
-    setSelectedOrder(order);
-    setModalVisible(true);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Pendente':
-        return '#FFC107';
-      case 'Em Coleta':
-        return '#2196F3';
-      case 'Finalizado':
-        return '#4CAF50';
-      default:
-        return '#666666';
-    }
-  };
+export default function OrderParceiroMenuScreen() {
+  const { user } = useUser();
 
   return (
     <ScrollView style={styles.container}>
@@ -47,77 +18,85 @@ export default function OrderParceiroScreen() {
         <Text style={styles.backButtonText}>Voltar</Text>
       </TouchableOpacity>
 
-      <Text style={styles.title}>Pedidos de Coleta</Text>
-
-      <View style={styles.content}>
-        {mockOrders.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.orderCard}
-            onPress={() => handleOrderPress(item)}
-          >
-            <View style={styles.orderHeader}>
-              <Text style={styles.orderNumber}>{item.orderNumber}</Text>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-                <Text style={styles.statusText}>{item.status}</Text>
-              </View>
-            </View>
-            <View style={styles.orderInfo}>
-              <Text style={styles.orderType}>{item.type}</Text>
-              <Text style={styles.orderDate}>{item.scheduledDate}</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.header}>
+        <Text style={styles.title}>Gestão de Coletas</Text>
+        <Text style={styles.subtitle}>Gerencie suas solicitações de coleta</Text>
       </View>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {selectedOrder?.orderNumber}
+      <View style={styles.content}>
+        <TouchableOpacity
+          style={styles.menuCard}
+          onPress={() => router.push('/aceitarSolicitacaoParceiro')}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: '#4CAF50' }]}>
+            <Feather name="plus-circle" size={32} color="#FFFFFF" />
+          </View>
+          <View style={styles.menuCardContent}>
+            <Text style={styles.menuCardTitle}>Aceitar Solicitações</Text>
+            <Text style={styles.menuCardDescription}>
+              Visualize e aceite novas solicitações de coleta disponíveis na sua região
             </Text>
-            <View style={styles.modalDetails}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Status:</Text>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedOrder?.status) }]}>
-                  <Text style={styles.statusText}>{selectedOrder?.status}</Text>
-                </View>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Tipo:</Text>
-                <Text style={styles.detailValue}>{selectedOrder?.type}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Endereço:</Text>
-                <Text style={styles.detailValue}>{selectedOrder?.address}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Data Agendada:</Text>
-                <Text style={styles.detailValue}>{selectedOrder?.scheduledDate}</Text>
-              </View>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuCard}
+          onPress={() => router.push('/dashboardParceiro')}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: '#2196F3' }]}>
+            <Feather name="clipboard" size={32} color="#FFFFFF" />
+          </View>
+          <View style={styles.menuCardContent}>
+            <Text style={styles.menuCardTitle}>Dashboard de Pedidos</Text>
+            <Text style={styles.menuCardDescription}>
+              Acompanhe e gerencie as coletas que você aceitou
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuCard}
+          onPress={() => router.push('/historicRequest')}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: '#9C27B0' }]}>
+            <Feather name="clock" size={32} color="#FFFFFF" />
+          </View>
+          <View style={styles.menuCardContent}>
+            <Text style={styles.menuCardTitle}>Histórico</Text>
+            <Text style={styles.menuCardDescription}>
+              Consulte todas as coletas que você já realizou
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.statsContainer}>
+          <Text style={styles.statsTitle}>Resumo de Atividades</Text>
+          
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>0</Text>
+              <Text style={styles.statLabel}>Coletas Pendentes</Text>
             </View>
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#2196F3' }]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.actionButtonText}>Iniciar Coleta</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#666666' }]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.actionButtonText}>Fechar</Text>
-              </TouchableOpacity>
+            
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>0</Text>
+              <Text style={styles.statLabel}>Coletas Concluídas</Text>
+            </View>
+          </View>
+          
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>0kg</Text>
+              <Text style={styles.statLabel}>Material Coletado</Text>
+            </View>
+            
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>R$ 0,00</Text>
+              <Text style={styles.statLabel}>Ganhos Totais</Text>
             </View>
           </View>
         </View>
-      </Modal>
+      </View>
 
       <View style={styles.footer}>
         <FontAwesome5 name="leaf" size={40} color="#4CAF50" />
@@ -143,123 +122,104 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Medium',
     color: '#333333',
   },
+  header: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontFamily: 'Roboto-Bold',
     color: '#333333',
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Regular',
+    color: '#666666',
   },
   content: {
     padding: 16,
-    gap: 12,
   },
-  orderCard: {
+  menuCard: {
     backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    marginBottom: 12,
   },
-  orderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  orderNumber: {
-    fontSize: 18,
-    fontFamily: 'Roboto-Medium',
-    color: '#333333',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-  },
-  statusText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: 'Roboto-Medium',
-  },
-  orderInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  orderType: {
-    fontSize: 14,
-    fontFamily: 'Roboto-Regular',
-    color: '#666666',
-  },
-  orderDate: {
-    fontSize: 14,
-    fontFamily: 'Roboto-Regular',
-    color: '#666666',
-  },
-  modalContainer: {
-    flex: 1,
+  iconContainer: {
+    borderRadius: 50,
+    width: 64,
+    height: 64,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 16,
+    marginRight: 16,
   },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
+  menuCardContent: {
+    flex: 1,
   },
-  modalTitle: {
-    fontSize: 24,
+  menuCardTitle: {
+    fontSize: 18,
     fontFamily: 'Roboto-Bold',
     color: '#333333',
-    marginBottom: 24,
+    marginBottom: 4,
   },
-  modalDetails: {
-    gap: 16,
-    marginBottom: 24,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  detailLabel: {
-    fontSize: 16,
-    fontFamily: 'Roboto-Medium',
-    color: '#666666',
-    width: 120,
-  },
-  detailValue: {
-    fontSize: 16,
+  menuCardDescription: {
+    fontSize: 14,
     fontFamily: 'Roboto-Regular',
+    color: '#666666',
+    lineHeight: 20,
+  },
+  statsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginTop: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontFamily: 'Roboto-Bold',
     color: '#333333',
-    flex: 1,
+    marginBottom: 16,
   },
-  modalActions: {
+  statsRow: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  actionButton: {
-    flex: 1,
+  statCard: {
+    backgroundColor: '#F5F5F5',
+    width: '48%',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  statValue: {
+    fontSize: 20,
+    fontFamily: 'Roboto-Bold',
+    color: '#4CAF50',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
     fontFamily: 'Roboto-Medium',
+    color: '#666666',
   },
   footer: {
     alignItems: 'center',
-    padding: 16,
+    padding: 32,
+    marginTop: 16,
   },
   footerText: {
     marginTop: 8,

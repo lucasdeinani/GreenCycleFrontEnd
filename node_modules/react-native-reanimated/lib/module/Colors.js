@@ -538,18 +538,23 @@ export const hsvToColor = (h, s, v, a) => {
 function processColorInitially(color) {
   'worklet';
 
-  if (color === null || color === undefined || typeof color === 'number') {
+  if (color === null || color === undefined) {
     return color;
   }
-  let normalizedColor = normalizeColor(color);
-  if (normalizedColor === null || normalizedColor === undefined) {
-    return undefined;
+  let colorNumber;
+  if (typeof color === 'number') {
+    colorNumber = color;
+  } else {
+    const normalizedColor = normalizeColor(color);
+    if (normalizedColor === null || normalizedColor === undefined) {
+      return undefined;
+    }
+    if (typeof normalizedColor !== 'number') {
+      return null;
+    }
+    colorNumber = normalizedColor;
   }
-  if (typeof normalizedColor !== 'number') {
-    return null;
-  }
-  normalizedColor = (normalizedColor << 24 | normalizedColor >>> 8) >>> 0; // alpha rgb
-  return normalizedColor;
+  return (colorNumber << 24 | colorNumber >>> 8) >>> 0; // alpha rgb
 }
 export function isColor(value) {
   'worklet';

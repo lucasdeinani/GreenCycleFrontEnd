@@ -4,7 +4,6 @@ import {
   Platform, ActivityIndicator, Alert
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Camera, Check, Edit, Lock, Save, X } from 'lucide-react-native';
 import { Feather } from '@expo/vector-icons';
 import { useUser } from '../context/UserContext';
 import { PasswordResetModal } from './password_reset_modal';

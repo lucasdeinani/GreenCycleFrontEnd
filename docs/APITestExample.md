@@ -75,6 +75,14 @@ const testUpload = async () => {
 - **DELETE** `/v1/imagens-perfil/{id_usuario}/` - Deletar imagem existente
 - **GET** `/v1/imagens-perfil/{id_usuario}/` - Buscar imagem específica
 
+### Resposta quando usuário não tem imagem:
+```json
+{
+    "detail": "No ImagemPerfil matches the given query."
+}
+```
+**Comportamento**: Sistema usa imagem padrão automaticamente
+
 ### Fluxo de Atualização:
 1. **DELETE** - Remove imagem existente (se houver)
 2. **POST** - Faz upload da nova imagem

@@ -3,17 +3,17 @@ import { View, Text, TouchableOpacity, Modal, StyleSheet, Dimensions } from 'rea
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import { VideoView, useVideoPlayer } from 'expo-video';
+import { WebView } from 'react-native-webview';
 
 const { width, height } = Dimensions.get('window');
 
-// URLs dos vídeos locais ou remotos
+// URLs dos vídeos do YouTube
 const videos = [
-  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', // Papel - exemplo
-  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', // Plastico - exemplo
-  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', // Metal - exemplo
-  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', // Hospitalar - exemplo
-  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4', // Organico - exemplo
+  'https://www.youtube.com/embed/DaTnsqQktag', // Papel
+  'https://www.youtube.com/embed/uMZJUcWAKbE', // Plastico
+  'https://www.youtube.com/embed/xouKg3XwrxY', // Metal
+  'https://www.youtube.com/embed/8YRl79CcVBo', // Hospitalar
+  'https://www.youtube.com/embed/Zue2bN1-Pp8', // Organico
 ];
 
 const buttonNames = ['Papel', 'Plastico', 'Metal', 'Hospitalar', 'Organico'];
@@ -21,11 +21,6 @@ const buttonNames = ['Papel', 'Plastico', 'Metal', 'Hospitalar', 'Organico'];
 export default function VideoScreen() {
   const [selectedVideoIndex, setSelectedVideoIndex] = useState<number | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  
-  const player = useVideoPlayer(selectedVideoIndex !== null ? videos[selectedVideoIndex] : '', player => {
-    player.loop = false;
-    player.play();
-  });
 
   const handleVideoPress = (index: number) => {
     setSelectedVideoIndex(index);
@@ -34,7 +29,6 @@ export default function VideoScreen() {
 
   const closeModal = () => {
     setModalVisible(false);
-    player.pause();
     setSelectedVideoIndex(null);
   };
 
@@ -81,11 +75,19 @@ export default function VideoScreen() {
           
           <View style={styles.videoContainer}>
             {selectedVideoIndex !== null && (
-              <VideoView
-                style={styles.video}
-                player={player}
-                allowsFullscreen
-                allowsPictureInPicture
+              <WebView
+                style={styles.webview}
+                source={{ uri: videos[selectedVideoIndex] }}
+                allowsFullscreenVideo={true}
+                mediaPlaybackRequiresUserAction={false}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                startInLoadingState={true}
+                renderLoading={() => (
+                  <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Carregando vídeo...</Text>
+                  </View>
+                )}
               />
             )}
           </View>
@@ -158,13 +160,26 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     flex: 1,
+    backgroundColor: '#000000',
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  video: {
-    width: width,
-    height: width * (9/16), // Aspect ratio 16:9
     backgroundColor: '#000000',
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Medium',
   },
   footer: {
     alignItems: 'center',

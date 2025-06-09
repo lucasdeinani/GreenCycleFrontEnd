@@ -12,6 +12,7 @@ export interface ProfileImage {
   file_id: string;
   created_at?: string;
   updated_at?: string;
+  detail?: string;  // Campo para mensagens de erro da API
 }
 
 export class ImageService {
@@ -99,9 +100,15 @@ export class ImageService {
         return cachedImage;
       }
 
-      // 2. Buscar na API
-             try {
+             // 2. Buscar na API
+       try {
          const response = await axios.get<ProfileImage>(`${API_BASE_URL}/imagens-perfil/${userId}/`);
+         
+         // Verificar se a resposta indica que não há imagem
+         if (response.data?.detail === "No ImagemPerfil matches the given query.") {
+           console.log('📷 Usuário não possui imagem de perfil cadastrada');
+           return DEFAULT_PROFILE_IMAGES[userType];
+         }
          
          if (response.data?.imagem) {
            // Baixar e cachear a imagem
@@ -110,12 +117,16 @@ export class ImageService {
              return cachedPath;
            }
          }
-      } catch (apiError: any) {
-        // Se erro 404, usuário não tem imagem
-        if (apiError.response?.status !== 404) {
-          console.error('Erro ao buscar imagem na API:', apiError);
-        }
-      }
+       } catch (apiError: any) {
+         // Se erro 404 ou resposta com detail, usuário não tem imagem
+         if (apiError.response?.status === 404) {
+           console.log('📷 Usuário não possui imagem de perfil (404)');
+         } else if (apiError.response?.data?.detail === "No ImagemPerfil matches the given query.") {
+           console.log('📷 Usuário não possui imagem de perfil cadastrada');
+         } else {
+           console.error('Erro ao buscar imagem na API:', apiError);
+         }
+       }
 
       // 3. Retornar imagem padrão
       return DEFAULT_PROFILE_IMAGES[userType];
@@ -338,10 +349,21 @@ export class ImageService {
   static async getProfileImageInfo(userId: number): Promise<ProfileImage | null> {
     try {
       const response = await axios.get<ProfileImage>(`${API_BASE_URL}/imagens-perfil/${userId}/`);
+      
+      // Verificar se a resposta indica que não há imagem
+      if (response.data?.detail === "No ImagemPerfil matches the given query.") {
+        console.log('📷 Usuário não possui imagem de perfil cadastrada');
+        return null;
+      }
+      
       return response.data || null;
     } catch (error: any) {
       if (error.response?.status === 404) {
+        console.log('📷 Usuário não possui imagem de perfil (404)');
         return null; // Usuário não tem imagem
+      } else if (error.response?.data?.detail === "No ImagemPerfil matches the given query.") {
+        console.log('📷 Usuário não possui imagem de perfil cadastrada');
+        return null;
       }
       console.error('Erro ao obter informações da imagem:', error);
       return null;

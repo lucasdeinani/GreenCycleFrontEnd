@@ -14,7 +14,7 @@ export interface UseProfileImageReturn {
 }
 
 export const useProfileImage = (): UseProfileImageReturn => {
-  const { user } = useUser();
+  const { user, updateProfileImage, clearProfileImage } = useUser();
   const [imageUri, setImageUri] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
@@ -28,6 +28,13 @@ export const useProfileImage = (): UseProfileImageReturn => {
       setIsLoading(true);
       setError(null);
 
+      // Verificar se existe imagem no contexto do usuário primeiro
+      if (user.profileImageUri) {
+        setImageUri(user.profileImageUri);
+        setIsLoading(false);
+        return;
+      }
+
       // Inicializar cache se necessário
       await ImageService.initializeCache();
 
@@ -38,6 +45,11 @@ export const useProfileImage = (): UseProfileImageReturn => {
       );
 
       setImageUri(profileImageUri);
+      
+      // Atualizar no contexto se for uma imagem válida (não padrão)
+      if (profileImageUri && profileImageUri !== DEFAULT_PROFILE_IMAGES[user.tipo]) {
+        updateProfileImage(profileImageUri);
+      }
     } catch (err) {
       console.error('Erro ao carregar imagem de perfil:', err);
       setError('Erro ao carregar imagem de perfil');
@@ -49,7 +61,7 @@ export const useProfileImage = (): UseProfileImageReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [user?.user_id, user?.tipo]);
+  }, [user?.user_id, user?.tipo, user?.profileImageUri, updateProfileImage]);
 
   // Atualizar imagem de perfil
   const updateImage = useCallback(async () => {
@@ -69,6 +81,9 @@ export const useProfileImage = (): UseProfileImageReturn => {
         if (success) {
           // Recarregar imagem do cache
           await loadProfileImage();
+          
+          // Sincronizar com contexto do usuário
+          updateProfileImage(selectedImageUri);
         } else {
           setError('Erro ao atualizar imagem de perfil');
         }
@@ -79,7 +94,7 @@ export const useProfileImage = (): UseProfileImageReturn => {
     } finally {
       setIsUpdating(false);
     }
-  }, [user?.user_id, loadProfileImage]);
+  }, [user?.user_id, loadProfileImage, updateProfileImage]);
 
   // Deletar imagem de perfil
   const deleteImage = useCallback(async () => {
@@ -92,6 +107,9 @@ export const useProfileImage = (): UseProfileImageReturn => {
       const success = await ImageService.deleteProfileImage(user.user_id);
       
       if (success) {
+        // Limpar do contexto do usuário
+        clearProfileImage();
+        
         // Recarregar imagem (vai mostrar a padrão)
         await loadProfileImage();
       } else {
@@ -103,7 +121,7 @@ export const useProfileImage = (): UseProfileImageReturn => {
     } finally {
       setIsUpdating(false);
     }
-  }, [user?.user_id, loadProfileImage]);
+  }, [user?.user_id, loadProfileImage, clearProfileImage]);
 
   // Recarregar imagem
   const refreshImage = useCallback(async () => {

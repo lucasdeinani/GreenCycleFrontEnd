@@ -32,6 +32,9 @@ type User = {
     preco?: string;
   }>;
   
+  // Imagem de perfil
+  profileImageUri?: string;   // URI da imagem de perfil atual
+  
   // Endereço
   endereco?: {
     id: number;
@@ -53,6 +56,8 @@ type UserContextType = {
   login: (userData: any, type: 'client' | 'partner') => Promise<void>;
   logout: () => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
+  updateProfileImage: (imageUri: string) => void;
+  clearProfileImage: () => void;
   isAuthenticated: boolean;
 };
 
@@ -155,9 +160,25 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateProfileImage = (imageUri: string) => {
+    if (user) {
+      const updatedUser = { ...user, profileImageUri: imageUri };
+      setUser(updatedUser);
+      AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  };
+
+  const clearProfileImage = () => {
+    if (user) {
+      const updatedUser = { ...user, profileImageUri: undefined };
+      setUser(updatedUser);
+      AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  };
+
   return (
     <UserContext.Provider value={
-      { user, setUser, login, logout, updatePassword, isAuthenticated }
+      { user, setUser, login, logout, updatePassword, updateProfileImage, clearProfileImage, isAuthenticated }
       }>
       {children}
     </UserContext.Provider>

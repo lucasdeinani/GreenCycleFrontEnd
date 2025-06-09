@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Modal, StyleSheet, Image, ScrollView, Dim
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import { VideoView, useVideoPlayer } from 'expo-video';
+import { WebView } from 'react-native-webview';
 
 const { width, height } = Dimensions.get('window');
 
@@ -17,32 +17,32 @@ interface Video {
 const videos: Video[] = [
   {
     id: 1,
-    title: 'Como Separar Papel',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    title: 'Reciclar Papel',
+    url: 'https://www.youtube.com/embed/DaTnsqQktag',
     thumbnail: 'https://images.unsplash.com/photo-1585351737354-204ffbbe584f?w=800&h=450&fit=crop',
   },
   {
     id: 2,
-    title: 'Reciclagem de Plástico',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    title: 'Reciclagem do Plástico',
+    url: 'https://www.youtube.com/embed/uMZJUcWAKbE',
     thumbnail: 'https://images.unsplash.com/photo-1621451537084-482c73073a0f?w=800&h=450&fit=crop',
   },
   {
     id: 3,
-    title: 'Processamento de Metal',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    title: 'Reciclagem de Metal',
+    url: 'https://www.youtube.com/embed/xouKg3XwrxY',
     thumbnail: 'https://images.unsplash.com/photo-1625662276901-4a7ec44fbeed?w=800&h=450&fit=crop',
   },
   {
     id: 4,
-    title: 'Resíduos Hospitalares',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    title: 'Reciclagem Resíduos Hospitalares',
+    url: 'https://www.youtube.com/embed/8YRl79CcVBo',
     thumbnail: 'https://plus.unsplash.com/premium_photo-1681488170085-17f1308c26fe?w=800&h=450&fit=crop',
   },
   {
     id: 5,
     title: 'Compostagem',
-    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+    url: 'https://www.youtube.com/embed/Zue2bN1-Pp8',
     thumbnail: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&h=450&fit=crop',
   },
 ];
@@ -51,11 +51,6 @@ export default function VideoParceiroScreen() {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const player = useVideoPlayer(selectedVideo ? selectedVideo.url : '', player => {
-    player.loop = false;
-    player.play();
-  });
-
   const handleVideoPress = (video: Video) => {
     setSelectedVideo(video);
     setModalVisible(true);
@@ -63,7 +58,6 @@ export default function VideoParceiroScreen() {
 
   const closeModal = () => {
     setModalVisible(false);
-    player.pause();
     setSelectedVideo(null);
   };
 
@@ -123,11 +117,19 @@ export default function VideoParceiroScreen() {
           
           <View style={styles.videoContainer}>
             {selectedVideo && (
-              <VideoView
-                style={styles.video}
-                player={player}
-                allowsFullscreen
-                allowsPictureInPicture
+              <WebView
+                style={styles.webview}
+                source={{ uri: selectedVideo.url }}
+                allowsFullscreenVideo={true}
+                mediaPlaybackRequiresUserAction={false}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                startInLoadingState={true}
+                renderLoading={() => (
+                  <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Carregando vídeo...</Text>
+                  </View>
+                )}
               />
             )}
           </View>
@@ -237,17 +239,29 @@ const styles = StyleSheet.create({
     marginRight: 40,
   },
   videoContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#000000',
   },
-  video: {
-    width: width,
-    height: width * (9/16), // Aspect ratio 16:9
-    backgroundColor: '#000000',
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Medium',
   },
   videoInfo: {
-    flex: 1,
     backgroundColor: '#FFFFFF',
     padding: 16,
   },

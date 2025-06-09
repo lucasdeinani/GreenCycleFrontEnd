@@ -76,6 +76,14 @@ interface ProfileImage {
 }
 ```
 
+### Resposta quando usuário não tem imagem:
+```json
+{
+    "detail": "No ImagemPerfil matches the given query."
+}
+```
+**Comportamento**: Sistema detecta automaticamente e usa imagem padrão
+
 ## Fluxo de Funcionamento
 
 ### 1. Inicialização (Login)

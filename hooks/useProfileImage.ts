@@ -32,13 +32,16 @@ export const useProfileImage = (): UseProfileImageReturn => {
       if (user.profileImageUri) {
         setImageUri(user.profileImageUri);
         setIsLoading(false);
+        
+        // Mesmo tendo no contexto, ainda verifica atualizações em background
+        checkForUpdatesInBackground();
         return;
       }
 
       // Inicializar cache se necessário
       await ImageService.initializeCache();
 
-      // Obter imagem de perfil
+      // Obter imagem de perfil (com verificação automática em background)
       const profileImageUri = await ImageService.getProfileImage(
         user.user_id, 
         user.tipo
@@ -62,6 +65,36 @@ export const useProfileImage = (): UseProfileImageReturn => {
       setIsLoading(false);
     }
   }, [user?.user_id, user?.tipo, user?.profileImageUri, updateProfileImage]);
+
+  // Verificar atualizações em background
+  const checkForUpdatesInBackground = useCallback(async () => {
+    if (!user?.user_id) return;
+
+    try {
+      // Verificar se há atualizações
+      const updatedImageUri = await ImageService.checkForImageUpdates(
+        user.user_id,
+        user.tipo,
+        imageUri
+      );
+
+      // Se houve atualização, atualizar o estado
+      if (updatedImageUri && updatedImageUri !== imageUri) {
+        console.log('🔄 Atualizando imagem após verificação em background');
+        setImageUri(updatedImageUri);
+        
+        // Atualizar no contexto se for uma imagem válida (não padrão)
+        if (updatedImageUri !== DEFAULT_PROFILE_IMAGES[user.tipo]) {
+          updateProfileImage(updatedImageUri);
+        } else {
+          clearProfileImage();
+        }
+      }
+    } catch (err) {
+      console.log('Erro ao verificar atualizações em background:', err);
+      // Falhas silenciosas para não atrapalhar UX
+    }
+  }, [user?.user_id, user?.tipo, imageUri, updateProfileImage, clearProfileImage]);
 
   // Atualizar imagem de perfil
   const updateImage = useCallback(async () => {

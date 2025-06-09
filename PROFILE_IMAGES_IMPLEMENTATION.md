@@ -261,4 +261,13 @@ A implementação está **100% completa** e pronta para ser testada. Todos os re
 7. ✅ Regras de negócio (DELETE antes de CREATE)
 8. ✅ Performance otimizada para ambas as plataformas
 
+### **Nova Funcionalidade - Verificação Automática de Atualizações:**
+- ✅ **Verificação em Background**: A cada abertura, verifica se há mudanças na API
+- ✅ **Cache + Sync**: Carrega imagem do cache instantaneamente, depois verifica atualizações
+- ✅ **Metadados Inteligentes**: Salva URL original para comparação automática
+- ✅ **Detecção de Mudanças**: Compara URLs e atualiza automaticamente se necessário
+- ✅ **Sincronização Completa**: Mantém todos os componentes sincronizados
+- ✅ **Performance Otimizada**: Verificação não bloqueia interface
+- ✅ **Documentação**: Detalhada em `docs/AutoImageSyncFeature.md`
+
 **🎉 O sistema está pronto para produção!** 

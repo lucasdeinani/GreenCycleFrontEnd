@@ -78,9 +78,20 @@ export class ImageService {
   static async downloadAndCacheImage(userId: number, imageUrl: string): Promise<string | null> {
     try {
       const cachedPath = `${this.CACHE_DIR}${userId}.jpg`;
+      const metadataPath = `${this.CACHE_DIR}${userId}_metadata.json`;
       const downloadResult = await FileSystem.downloadAsync(imageUrl, cachedPath);
       
       if (downloadResult.status === 200) {
+        // Salvar metadados com URL original para comparação
+        const metadata = {
+          originalUrl: imageUrl,
+          cachedAt: new Date().toISOString(),
+          userId: userId
+        };
+        
+        await FileSystem.writeAsStringAsync(metadataPath, JSON.stringify(metadata));
+        
+        console.log('✅ Imagem baixada e salva no cache:', cachedPath);
         return cachedPath;
       }
       return null;
@@ -93,40 +104,49 @@ export class ImageService {
   // Obter imagem de perfil (cache primeiro, depois API, depois default)
   static async getProfileImage(userId: number, userType: 'client' | 'partner'): Promise<string> {
     try {
-      // 1. Verificar cache local primeiro
-      console.log('Verificando cache local para o usuário:', userId);
+      // 1. Verificar cache local primeiro para exibição rápida
+      console.log('📁 Verificando cache local para o usuário:', userId);
       const cachedImage = await this.getCachedImage(userId);
       if (cachedImage) {
+        console.log('📁 Imagem encontrada no cache, verificando atualizações em background...');
+        
+        // Verificar em background se há atualizações na API
+        this.checkForImageUpdates(userId, userType, cachedImage);
+        
         return cachedImage;
       }
 
-             // 2. Buscar na API
-       try {
-         const response = await axios.get<ProfileImage>(`${API_BASE_URL}/imagens-perfil/${userId}/`);
-         
-         // Verificar se a resposta indica que não há imagem
-         if (response.data?.detail === "No ImagemPerfil matches the given query.") {
-           console.log('📷 Usuário não possui imagem de perfil cadastrada');
-           return DEFAULT_PROFILE_IMAGES[userType];
-         }
-         
-         if (response.data?.imagem) {
-           // Baixar e cachear a imagem
-           const cachedPath = await this.downloadAndCacheImage(userId, response.data.imagem);
-           if (cachedPath) {
-             return cachedPath;
-           }
-         }
-       } catch (apiError: any) {
-         // Se erro 404 ou resposta com detail, usuário não tem imagem
-         if (apiError.response?.status === 404) {
-           console.log('📷 Usuário não possui imagem de perfil (404)');
-         } else if (apiError.response?.data?.detail === "No ImagemPerfil matches the given query.") {
-           console.log('📷 Usuário não possui imagem de perfil cadastrada');
-         } else {
-           console.error('Erro ao buscar imagem na API:', apiError);
-         }
-       }
+      // 2. Buscar na API se não tem cache
+      try {
+        console.log('🌐 Buscando imagem na API...');
+        const response = await axios.get<ProfileImage>(`${API_BASE_URL}/imagens-perfil/${userId}/`);
+        
+        // Verificar se a resposta indica que não há imagem
+        if (response.data?.detail === "No ImagemPerfil matches the given query.") {
+          console.log('📷 Usuário não possui imagem de perfil cadastrada');
+          return DEFAULT_PROFILE_IMAGES[userType];
+        }
+        
+        if (response.data?.imagem) {
+          console.log('📷 Imagem encontrada na API:', response.data.imagem);
+          // Baixar e cachear a imagem
+          const cachedPath = await this.downloadAndCacheImage(userId, response.data.imagem);
+          if (cachedPath) {
+            return cachedPath;
+          }
+          // Se falhou ao cachear, usar URL direta
+          return response.data.imagem;
+        }
+      } catch (apiError: any) {
+        // Se erro 404 ou resposta com detail, usuário não tem imagem
+        if (apiError.response?.status === 404) {
+          console.log('📷 Usuário não possui imagem de perfil (404)');
+        } else if (apiError.response?.data?.detail === "No ImagemPerfil matches the given query.") {
+          console.log('📷 Usuário não possui imagem de perfil cadastrada');
+        } else {
+          console.error('Erro ao buscar imagem na API:', apiError);
+        }
+      }
 
       // 3. Retornar imagem padrão
       return DEFAULT_PROFILE_IMAGES[userType];
@@ -305,13 +325,92 @@ export class ImageService {
   static async clearCacheForUser(userId: number): Promise<void> {
     try {
       const cachedPath = `${this.CACHE_DIR}${userId}.jpg`;
-      const fileInfo = await FileSystem.getInfoAsync(cachedPath);
+      const metadataPath = `${this.CACHE_DIR}${userId}_metadata.json`;
       
+      const fileInfo = await FileSystem.getInfoAsync(cachedPath);
       if (fileInfo.exists) {
         await FileSystem.deleteAsync(cachedPath);
       }
+      
+      const metadataInfo = await FileSystem.getInfoAsync(metadataPath);
+      if (metadataInfo.exists) {
+        await FileSystem.deleteAsync(metadataPath);
+      }
     } catch (error) {
       console.error('Erro ao limpar cache do usuário:', error);
+    }
+  }
+
+  // Verificar em background se há atualizações na imagem
+  static async checkForImageUpdates(
+    userId: number, 
+    userType: 'client' | 'partner', 
+    currentCachedImage: string
+  ): Promise<string | null> {
+    try {
+      console.log('🔄 Verificando atualizações da imagem em background...');
+      
+      const response = await axios.get<ProfileImage>(`${API_BASE_URL}/imagens-perfil/${userId}/`);
+      
+      // Verificar se usuário não tem mais imagem
+      if (response.data?.detail === "No ImagemPerfil matches the given query.") {
+        console.log('📷 Usuário removeu a imagem de perfil');
+        await this.clearCacheForUser(userId);
+        return DEFAULT_PROFILE_IMAGES[userType];
+      }
+
+      if (response.data?.imagem) {
+        // Obter URL da imagem atual em cache
+        const cachedImageUrl = await this.getCachedImageUrl(userId);
+        
+        // Comparar URLs para ver se houve mudança
+        if (cachedImageUrl !== response.data.imagem) {
+          console.log('🔄 Nova imagem detectada na API, atualizando cache...');
+          console.log('📷 URL antiga:', cachedImageUrl);
+          console.log('📷 URL nova:', response.data.imagem);
+          
+          // Baixar e cachear nova imagem
+          const newCachedPath = await this.downloadAndCacheImage(userId, response.data.imagem);
+          
+          if (newCachedPath) {
+            console.log('✅ Cache atualizado com nova imagem');
+            return newCachedPath;
+          }
+        } else {
+          console.log('✅ Imagem no cache está atualizada');
+        }
+      }
+      
+      return null; // Nenhuma atualização necessária
+    } catch (error: any) {
+      if (error.response?.status === 404 || 
+          error.response?.data?.detail === "No ImagemPerfil matches the given query.") {
+        console.log('📷 Usuário não possui mais imagem de perfil');
+        await this.clearCacheForUser(userId);
+        return DEFAULT_PROFILE_IMAGES[userType];
+      }
+      
+      console.error('Erro ao verificar atualizações da imagem:', error);
+      return null;
+    }
+  }
+
+  // Obter URL da imagem em cache (para comparação)
+  private static async getCachedImageUrl(userId: number): Promise<string | null> {
+    try {
+      const metadataPath = `${this.CACHE_DIR}${userId}_metadata.json`;
+      const metadataInfo = await FileSystem.getInfoAsync(metadataPath);
+      
+      if (metadataInfo.exists) {
+        const metadata = await FileSystem.readAsStringAsync(metadataPath);
+        const data = JSON.parse(metadata);
+        return data.originalUrl || null;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Erro ao obter URL da imagem em cache:', error);
+      return null;
     }
   }
 

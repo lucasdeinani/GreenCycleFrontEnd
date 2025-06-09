@@ -1,11 +1,13 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from '../context/UserContext';
+import { useProfileImage } from '../../hooks/useProfileImage';
 
 export default function MenuScreen() {
   const { user, setUser } = useUser();
+  const { imageUri, isLoading: imageLoading } = useProfileImage();
   console.log('Usuário no contexto:', user);
   const handleLogout = () => {
     router.replace('/login');
@@ -15,10 +17,16 @@ export default function MenuScreen() {
     <ScrollView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.profileSection}>
-          <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=180&h=180&fit=crop&q=80&auto=format' }}
-            style={styles.profileImage}
-          />
+          {imageLoading ? (
+            <View style={[styles.profileImage, styles.loadingContainer]}>
+              <ActivityIndicator size="large" color="#4CAF50" />
+            </View>
+          ) : (
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.profileImage}
+            />
+          )}
           <Text style={styles.profileName}>{user?.nome ?? 'Usuario'}</Text>
         </View>
 
@@ -92,6 +100,12 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
+    marginBottom: 16,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
     marginBottom: 16,
   },
   profileName: {

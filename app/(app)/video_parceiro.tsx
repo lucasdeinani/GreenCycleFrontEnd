@@ -1,52 +1,70 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, Image, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, Image, ScrollView, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import { WebView } from 'react-native-webview';
+import { VideoView, useVideoPlayer } from 'expo-video';
 
+const { width, height } = Dimensions.get('window');
 
-// Example video URLs with proper YouTube embed format
-const videos = [
+interface Video {
+  id: number;
+  title: string;
+  url: string;
+  thumbnail: string;
+}
+
+const videos: Video[] = [
   {
     id: 1,
     title: 'Como Separar Papel',
-    url: 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0',
-    thumbnail: 'https://images.unsplash.com/photo-1571727153934-b9e0059b7ab2?w=800&h=450&fit=crop',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1585351737354-204ffbbe584f?w=800&h=450&fit=crop',
   },
   {
     id: 2,
     title: 'Reciclagem de Plástico',
-    url: 'https://www.youtube.com/embed/jG7dSXcfVqE?autoplay=1&rel=0',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
     thumbnail: 'https://images.unsplash.com/photo-1621451537084-482c73073a0f?w=800&h=450&fit=crop',
   },
   {
     id: 3,
     title: 'Processamento de Metal',
-    url: 'https://www.youtube.com/embed/9bZkp7q19f0?autoplay=1&rel=0',
-    thumbnail: 'https://images.unsplash.com/photo-1558640476-437a2b9438a2?w=800&h=450&fit=crop',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    thumbnail: 'https://images.unsplash.com/photo-1625662276901-4a7ec44fbeed?w=800&h=450&fit=crop',
   },
   {
     id: 4,
     title: 'Resíduos Hospitalares',
-    url: 'https://www.youtube.com/embed/M7FIvfx5J10?autoplay=1&rel=0',
-    thumbnail: 'https://images.unsplash.com/photo-1587556930799-8dca6fad6d7e?w=800&h=450&fit=crop',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    thumbnail: 'https://plus.unsplash.com/premium_photo-1681488170085-17f1308c26fe?w=800&h=450&fit=crop',
   },
   {
     id: 5,
     title: 'Compostagem',
-    url: 'https://www.youtube.com/embed/pW4v8XkF1O0?autoplay=1&rel=0',
+    url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
     thumbnail: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&h=450&fit=crop',
   },
 ];
 
 export default function VideoParceiroScreen() {
-  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const handleVideoPress = (video) => {
+  const player = useVideoPlayer(selectedVideo ? selectedVideo.url : '', player => {
+    player.loop = false;
+    player.play();
+  });
+
+  const handleVideoPress = (video: Video) => {
     setSelectedVideo(video);
     setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    player.pause();
+    setSelectedVideo(null);
   };
 
   return (
@@ -86,29 +104,38 @@ export default function VideoParceiroScreen() {
 
       <Modal
         animationType="slide"
-        transparent={true}
+        transparent={false}
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={closeModal}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <WebView
-              style={styles.video}
-              source={{ uri: selectedVideo?.url }}
-              allowsFullscreenVideo
-              mediaPlaybackRequiresUserAction={false}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-            />
+          <View style={styles.modalHeader}>
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => {
-                setSelectedVideo(null);
-                setModalVisible(false);
-              }}
+              onPress={closeModal}
             >
-              <Text style={styles.closeButtonText}>Fechar</Text>
+              <Feather name="x" size={24} color="#333333" />
             </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              {selectedVideo ? selectedVideo.title : ''}
+            </Text>
+          </View>
+          
+          <View style={styles.videoContainer}>
+            {selectedVideo && (
+              <VideoView
+                style={styles.video}
+                player={player}
+                allowsFullscreen
+                allowsPictureInPicture
+              />
+            )}
+          </View>
+
+          <View style={styles.videoInfo}>
+            <Text style={styles.videoDescription}>
+              {selectedVideo ? selectedVideo.title : ''}
+            </Text>
           </View>
         </View>
       </Modal>
@@ -187,28 +214,48 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    justifyContent: 'center',
-    padding: 16,
+    backgroundColor: '#000000',
   },
-  modalContent: {
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    paddingBottom: 16,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  video: {
-    width: '100%',
-    height: 300,
   },
   closeButton: {
-    backgroundColor: '#2196F3',
-    padding: 16,
-    alignItems: 'center',
+    padding: 8,
   },
-  closeButtonText: {
-    color: '#FFFFFF',
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: 'Roboto-Bold',
+    color: '#333333',
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 40,
+  },
+  videoContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+  },
+  video: {
+    width: width,
+    height: width * (9/16), // Aspect ratio 16:9
+    backgroundColor: '#000000',
+  },
+  videoInfo: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+  },
+  videoDescription: {
     fontSize: 16,
     fontFamily: 'Roboto-Medium',
+    color: '#333333',
+    textAlign: 'center',
   },
   footer: {
     alignItems: 'center',

@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useContext } from 'react';
 import { API_BASE_URL } from '../configs'
 import axios from 'axios';
+import { ImageService } from '../../services/ImageService';
 
 type User = {
   // Dados básicos do usuário (tabela usuarios)
@@ -68,6 +69,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       if (storedUser) {
         setUser(JSON.parse(storedUser));
         setIsAuthenticated(true);
+        
+        // Inicializar cache de imagens quando carregar usuário
+        try {
+          await ImageService.initializeCache();
+        } catch (error) {
+          console.error('Erro ao inicializar cache de imagens:', error);
+        }
       }
     };
     loadUser();
@@ -109,6 +117,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     await AsyncStorage.setItem('user', JSON.stringify(userToStore));
     setUser(userToStore);
     setIsAuthenticated(true);
+
+    // Inicializar cache de imagens após login
+    try {
+      await ImageService.initializeCache();
+    } catch (error) {
+      console.error('Erro ao inicializar cache de imagens:', error);
+    }
   };
 
   const logout = async () => {

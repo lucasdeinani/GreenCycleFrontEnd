@@ -7,12 +7,14 @@ import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useUser } from '../context/UserContext';
 import { PasswordResetModal } from './password_reset_modal';
+import { useProfileImage } from '../../hooks/useProfileImage';
 import { REGISTER_MATERIALS } from '../configs';
 import axios from 'axios';
 import { API_BASE_URL } from '../configs';
 
 export default function ProfileParceiroScreen() {
   const { user, setUser } = useUser();
+  const { imageUri, isLoading: imageLoading, isUpdating: imageUpdating, updateImage } = useProfileImage();
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -193,16 +195,27 @@ export default function ProfileParceiroScreen() {
 
       <View style={styles.profileSection}>
         <View style={styles.profileImageContainer}>
-          <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=180&h=180&fit=crop&q=80&auto=format' }}
-            style={styles.profileImage}
-          />
+          {imageLoading ? (
+            <View style={[styles.profileImage, styles.loadingContainer]}>
+              <ActivityIndicator size="large" color="#FFC107" />
+            </View>
+          ) : (
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.profileImage}
+            />
+          )}
           {isEditing && (
             <TouchableOpacity
               style={styles.changePhotoButton}
-              onPress={() => console.log('Open camera')}
+              onPress={updateImage}
+              disabled={imageUpdating}
             >
-              <Feather name="camera" size={20} color="#FFFFFF" />
+              {imageUpdating ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Feather name="camera" size={20} color="#FFFFFF" />
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -372,6 +385,11 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     borderWidth: 3,
     borderColor: '#FFC107',
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
   },
   changePhotoButton: {
     position: 'absolute',

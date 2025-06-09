@@ -1,28 +1,41 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import { WebView } from 'react-native-webview';
+import { VideoView, useVideoPlayer } from 'expo-video';
 
-// Example video URLs (replace with actual videos later)
+const { width, height } = Dimensions.get('window');
+
+// URLs dos vídeos locais ou remotos
 const videos = [
-  'https://www.youtube.com/embed/dQw4w9WgXcQ', // Papel
-  'https://www.youtube.com/embed/dQw4w9WgXcQ', // Plastico
-  'https://www.youtube.com/embed/dQw4w9WgXcQ', // Metal
-  'https://www.youtube.com/embed/dQw4w9WgXcQ', // Hospitalar
-  'https://www.youtube.com/embed/dQw4w9WgXcQ', // Organico
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', // Papel - exemplo
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', // Plastico - exemplo
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', // Metal - exemplo
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', // Hospitalar - exemplo
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4', // Organico - exemplo
 ];
 
 const buttonNames = ['Papel', 'Plastico', 'Metal', 'Hospitalar', 'Organico'];
 
 export default function VideoScreen() {
-  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [selectedVideoIndex, setSelectedVideoIndex] = useState<number | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  
+  const player = useVideoPlayer(selectedVideoIndex !== null ? videos[selectedVideoIndex] : '', player => {
+    player.loop = false;
+    player.play();
+  });
 
-  const handleVideoPress = (index) => {
-    setSelectedVideo(videos[index]);
+  const handleVideoPress = (index: number) => {
+    setSelectedVideoIndex(index);
     setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    player.pause();
+    setSelectedVideoIndex(null);
   };
 
   return (
@@ -49,23 +62,32 @@ export default function VideoScreen() {
 
       <Modal
         animationType="slide"
-        transparent={true}
+        transparent={false}
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={closeModal}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <WebView
-              style={styles.video}
-              source={{ uri: selectedVideo }}
-              allowsFullscreenVideo
-            />
+          <View style={styles.modalHeader}>
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setModalVisible(false)}
+              onPress={closeModal}
             >
-              <Text style={styles.closeButtonText}>Fechar</Text>
+              <Feather name="x" size={24} color="#333333" />
             </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              {selectedVideoIndex !== null ? buttonNames[selectedVideoIndex] : ''}
+            </Text>
+          </View>
+          
+          <View style={styles.videoContainer}>
+            {selectedVideoIndex !== null && (
+              <VideoView
+                style={styles.video}
+                player={player}
+                allowsFullscreen
+                allowsPictureInPicture
+              />
+            )}
           </View>
         </View>
       </Modal>
@@ -112,28 +134,37 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    justifyContent: 'center',
-    padding: 16,
+    backgroundColor: '#000000',
   },
-  modalContent: {
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    paddingBottom: 16,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  video: {
-    width: '100%',
-    height: 300,
   },
   closeButton: {
-    backgroundColor: '#2196F3',
-    padding: 16,
+    padding: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: 'Roboto-Bold',
+    color: '#333333',
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 40,
+  },
+  videoContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  closeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Roboto-Medium',
+  video: {
+    width: width,
+    height: width * (9/16), // Aspect ratio 16:9
+    backgroundColor: '#000000',
   },
   footer: {
     alignItems: 'center',

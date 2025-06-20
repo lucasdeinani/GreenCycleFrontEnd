@@ -87,7 +87,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (apiResponse: any, type: 'client' | 'partner') => {
-    console.log('Resposta completa da API:', JSON.stringify(apiResponse, null, 2));
+    // ===== LOGS DE DEBUG ADICIONADOS =====
+    console.log('=== LOGIN DEBUG ===');
+    console.log('Tipo de usuário:', type);
+    console.log('Resposta da API:', JSON.stringify(apiResponse, null, 2));
+    // ===== FIM DOS LOGS ADICIONADOS =====
 
     const baseUser = {
       user_id: apiResponse.id_usuarios.id,
@@ -118,6 +122,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         };
 
     console.log('Objeto userToStore que será salvo:', JSON.stringify(userToStore, null, 2));
+    
+    // ===== LOGS DE DEBUG ADICIONADOS =====
+    console.log('Usuário salvo no contexto:', JSON.stringify(userToStore, null, 2));
+    console.log('=== FIM LOGIN DEBUG ===');
+    // ===== FIM DOS LOGS ADICIONADOS =====
   
     await AsyncStorage.setItem('user', JSON.stringify(userToStore));
     setUser(userToStore);

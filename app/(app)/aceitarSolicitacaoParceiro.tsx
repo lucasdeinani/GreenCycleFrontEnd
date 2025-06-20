@@ -19,172 +19,86 @@ import axios from 'axios';
 // URL base da API
 import { API_BASE_URL } from '../configs'
 
+// Tipos para a nova estrutura da API
+interface ColetaPendente {
+  id: number;
+  cliente_nome: string;
+  material_nome: string;
+  peso_material: string;
+  quantidade_material: string | number | null;
+  endereco_completo: string;
+  valor_pagamento: string | number;
+  distancia_km: number | null;
+  criado_em: string;
+  observacoes_solicitacao?: string;
+}
+
 // Ícones e cores para cada material
-const MATERIAL_ICONS = {
-  1: { icon: "disc", color: "#607D8B" },       // Metal
-  2: { icon: "file", color: "#795548" },       // Papel
-  3: { icon: "pocket", color: "#FF9800" },     // Plástico
-  4: { icon: "aperture", color: "#00BCD4" },   // Vidro
-  5: { icon: "cpu", color: "#9C27B0" },        // Eletrônico
-  6: { icon: "coffee", color: "#8BC34A" },     // Resíduo Orgânico
-  7: { icon: "thermometer", color: "#F44336" } // Resíduo Hospitalar
+const MATERIAL_ICONS: { [key: string]: { icon: string, color: string } } = {
+  'Metal': { icon: "disc", color: "#607D8B" },
+  'Papel': { icon: "file", color: "#795548" },
+  'Plástico': { icon: "pocket", color: "#FF9800" },
+  'Vidro': { icon: "aperture", color: "#00BCD4" },
+  'Eletrônico': { icon: "cpu", color: "#9C27B0" },
+  'Resíduo Orgânico': { icon: "coffee", color: "#8BC34A" },
+  'Resíduo Hospitalar': { icon: "thermometer", color: "#F44336" }
 };
 
 export default function AceitarSolicitacoesScreen() {
   const { user } = useUser();
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [solicitacoes, setSolicitacoes] = useState([]);
-  const [selectedSolicitacao, setSelectedSolicitacao] = useState(null);
+  const [solicitacoes, setSolicitacoes] = useState<ColetaPendente[]>([]);
+  const [selectedSolicitacao, setSelectedSolicitacao] = useState<ColetaPendente | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [aceitandoPedido, setAceitandoPedido] = useState(false);
-  const [materiais, setMateriais] = useState({});
-  const [materiaisParceiro, setMateriaisParceiro] = useState([]);
-  const [loadingMateriais, setLoadingMateriais] = useState(false);
   
-  // Buscar lista de materiais para exibição
-  const fetchMateriais = async () => {
-    try {
-      setLoadingMateriais(true);
-      const response = await axios.get(`${API_BASE_URL}/materiais`);
-      const materiaisObj = {};
-      response.data.forEach(material => {
-        materiaisObj[material.id] = material;
-      });
-      setMateriais(materiaisObj);
-    } catch (error) {
-      console.error('Erro ao buscar materiais:', error.response?.data || error.message);
-    } finally {
-      setLoadingMateriais(false);
-    }
-  };
-  
-  // Buscar materiais que o parceiro trabalha
-  const fetchMateriaisParceiro = async () => {
-    try {
-      if (!user.user_id) {
-        console.warn('ID do usuário não encontrado');
-        return;
-      }
-      
-      const response = await axios.get(`${API_BASE_URL}/materiais-parceiros?id_parceiros=${user.id}`);
-      const materiaisIds = response.data.map(mp => mp.id_materiais);
-      setMateriaisParceiro(materiaisIds);
-      
-      console.log('Materiais do parceiro:', materiaisIds);
-    } catch (error) {
-      console.error('Erro ao buscar materiais do parceiro:', error.response?.data || error.message);
-      // Se der erro, definir array vazio para permitir todos os materiais
-      setMateriaisParceiro([]);
-    }
-  };
-  
-  // Buscar solicitações disponíveis (estado_solicitacao = 1)
+  // Buscar solicitações disponíveis para o parceiro
   const fetchSolicitacoes = async () => {
     try {
-      // Aguardar que os materiais estejam carregados
-      if (loadingMateriais) {
-        console.log('Aguardando carregamento dos materiais...');
-        return;
-      }
-      
-      setIsLoading(true);
-      
-      // Buscar solicitações pendentes
-      const solicitacoesResponse = await axios.get(`${API_BASE_URL}/solicitacoes?estado_solicitacao=1`);
-      
-      if (solicitacoesResponse.data.length === 0) {
-        setSolicitacoes([]);
+      if (!user?.user_id) {
+        console.warn('ID do usuário não encontrado');
         setIsLoading(false);
-        setRefreshing(false);
         return;
       }
       
-      // Para cada solicitação, buscar os dados completos da coleta
-      const solicitacoesDetalhadas = await Promise.all(
-        solicitacoesResponse.data.map(async (solicitacao) => {
-          try {
-            // Validação básica da solicitação
-            if (!solicitacao || !solicitacao.id) {
-              console.warn('Dados de solicitação inválidos:', solicitacao);
-              return null;
-            }
-
-            // Buscar coleta relacionada à solicitação
-            const coletaResponse = await axios.get(`${API_BASE_URL}/coletas?id_solicitacoes=${solicitacao.id}`);
-            
-            if (coletaResponse.data.length === 0) {
-              console.warn('Solicitação sem coleta:', solicitacao.id);
-              return null; // Solicitação sem coleta, pular
-            }
-            
-            const coleta = coletaResponse.data[0];
-            
-            // Validação dos dados da coleta
-            if (!coleta || !coleta.id_materiais || !coleta.id_clientes) {
-              console.warn('Dados de coleta inválidos:', coleta);
-              return null;
-            }
-            
-            // Verificar se o material dessa coleta está entre os que o parceiro trabalha
-            // Se materiaisParceiro estiver vazio, aceitar todos os materiais
-            if (materiaisParceiro.length > 0 && !materiaisParceiro.includes(coleta.id_materiais)) {
-              console.log(`Material ${coleta.id_materiais} não está na lista do parceiro:`, materiaisParceiro);
-              return null; // Parceiro não trabalha com esse material, pular
-            }
-            
-            // Buscar cliente 
-            const clienteResponse = await axios.get(`${API_BASE_URL}/clientes/${coleta.id_clientes}`);
-            
-            // Buscar dados do usuário do cliente
-            const usuarioResponse = await axios.get(`${API_BASE_URL}/usuarios/${clienteResponse.data.id_usuarios}`);
-            
-            // Buscar endereço da coleta
-            const enderecoResponse = await axios.get(`${API_BASE_URL}/enderecos/${coleta.id_enderecos}`);
-            
-            // Buscar material
-            let materialInfo = materiais[coleta.id_materiais] || {};
-            if (!materialInfo.nome) {
-              try {
-                const materialResponse = await axios.get(`${API_BASE_URL}/materiais/${coleta.id_materiais}`);
-                materialInfo = materialResponse.data;
-              } catch (materialError) {
-                console.error('Erro ao buscar material individual:', materialError);
-                materialInfo = { nome: 'Material não especificado', preco: 1 };
-              }
-            }
-            
-            // Calcular distância (em uma implementação real, usaríamos geolocalização)
-            // Aqui estamos simulando uma distância aleatória
-            const distancia = (Math.random() * 10 + 0.5).toFixed(1);
-            
-            return {
-              solicitacao,
-              coleta,
-              cliente: {
-                ...clienteResponse.data,
-                usuario: usuarioResponse.data || {}
-              },
-              endereco: enderecoResponse.data || {},
-              material: materialInfo,
-              distancia
-            };
-          } catch (error) {
-            console.error('Erro ao buscar detalhes da solicitação:', error);
-            return null;
+      console.log('Buscando solicitações pendentes para parceiro:', user.user_id);
+      
+      // Usar o novo endpoint da API
+      const response = await axios.get(`${API_BASE_URL}/coletas/pendentes-parceiro/${user.user_id}/`);
+      
+      console.log('Solicitações recebidas:', response.data);
+      
+      // Filtrar e validar dados antes de processar
+      const solicitacoesValidas = response.data.filter((item: any) => {
+        return item && item.id && item.material_nome && item.peso_material;
+      }).map((item: any) => ({
+        ...item,
+        peso_material: item.peso_material || '0',
+        valor_pagamento: item.valor_pagamento || 0,
+        distancia_km: item.distancia_km || null,
+        cliente_nome: item.cliente_nome || 'Nome não disponível',
+        endereco_completo: item.endereco_completo || 'Endereço não disponível'
+      }));
+      
+      // Ordenar por distância (mais próximas primeiro) e depois por data
+      const solicitacoesOrdenadas = solicitacoesValidas.sort((a: ColetaPendente, b: ColetaPendente) => {
+        // Primeiro por distância (se disponível)
+        if (a.distancia_km !== null && b.distancia_km !== null) {
+          if (a.distancia_km !== b.distancia_km) {
+            return a.distancia_km - b.distancia_km;
           }
-        })
-      );
+        }
+        
+        // Depois por data (mais recente primeiro)
+        const dataA = new Date(a.criado_em || 0);
+        const dataB = new Date(b.criado_em || 0);
+        return dataB.getTime() - dataA.getTime();
+      });
       
-      // Filtrar solicitações nulas e ordenar por proximidade
-      const solicitacoesValidas = solicitacoesDetalhadas
-        .filter(sol => sol !== null)
-        .sort((a, b) => parseFloat(a.distancia) - parseFloat(b.distancia));
+      setSolicitacoes(solicitacoesOrdenadas);
       
-      console.log(`${solicitacoesValidas.length} solicitações carregadas para o parceiro`);
-      setSolicitacoes(solicitacoesValidas);
-      
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao buscar solicitações:', error.response?.data || error.message);
       Alert.alert('Erro', 'Não foi possível carregar as solicitações disponíveis. Verifique sua conexão e tente novamente.');
     } finally {
@@ -193,52 +107,44 @@ export default function AceitarSolicitacoesScreen() {
     }
   };
   
-  // Carregar dados iniciais - corrigido o problema de dependência circular
+  // Carregar dados iniciais
   useEffect(() => {
-    const fetchAll = async () => {
-        setIsLoading(true);
+    const loadSolicitacoes = async () => {
+      if (!user?.user_id) {
+        console.warn('ID do usuário não disponível ainda');
+        setIsLoading(false);
+        return;
+      }
 
-        try {
-            await Promise.all([fetchMateriais(), fetchSolicitacoes()]);
-        } catch (error) {
-            console.error('Erro ao carregar dados:', error);
-        } finally {
-            setIsLoading(false);
-        }
+      setIsLoading(true);
+      
+      try {
+        await fetchSolicitacoes();
+      } catch (error) {
+        console.error('Erro ao carregar solicitações:', error);
+        setIsLoading(false);
+      }
     };
 
-    fetchAll();
-}, [user]);
-  
-  // Separar useEffect para carregar solicitações após materiais estarem prontos
-  useEffect(() => {
-    // Só carregar solicitações se os materiais já foram carregados
-    if (!loadingMateriais && Object.keys(materiais).length > 0) {
-      fetchSolicitacoes();
-    }
-  }, [materiais, materiaisParceiro, loadingMateriais]);
+    loadSolicitacoes();
+  }, [user?.user_id]);
   
   // Função para aceitar a solicitação
   const handleAceitarSolicitacao = async () => {
-    if (!selectedSolicitacao?.solicitacao?.id || !selectedSolicitacao?.coleta?.id) {
-      Alert.alert('Erro', 'Dados da solicitação incompletos');
+    if (!selectedSolicitacao?.id || !user?.user_id) {
+      Alert.alert('Erro', 'Dados da solicitação ou usuário incompletos');
       return;
     }
     
     setAceitandoPedido(true);
     
     try {
-      // 1. Atualizar a solicitação para "Aprovado" (estado_solicitacao = 2)
-      await axios.patch(`${API_BASE_URL}/solicitacoes/${selectedSolicitacao.solicitacao.id}`, {
-        estado_solicitacao: "2" // Aprovado
+      // Usar o novo endpoint de aceitar coleta
+      await axios.post(`${API_BASE_URL}/coletas/${selectedSolicitacao.id}/aceitar-coleta/`, {
+        parceiro_id: user.user_id
       });
       
-      // 2. Atualizar a coleta com o ID do parceiro
-      await axios.patch(`${API_BASE_URL}/coletas/${selectedSolicitacao.coleta.id}`, {
-        id_parceiros: user.user_id
-      });
-      
-      // 3. Fechar o modal e atualizar a lista
+      // Fechar o modal e atualizar a lista
       setModalVisible(false);
       setSelectedSolicitacao(null);
       
@@ -252,14 +158,25 @@ export default function AceitarSolicitacoesScreen() {
           },
           {
             text: 'Continuar',
-            onPress: () => fetchSolicitacoes()
+            onPress: () => {
+              fetchSolicitacoes(); // Recarregar a lista de solicitações
+            }
           }
         ]
       );
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao aceitar solicitação:', error.response?.data || error.message);
-      Alert.alert('Erro', 'Não foi possível aceitar a solicitação. Tente novamente.');
+      
+      let errorMessage = 'Não foi possível aceitar a solicitação.';
+      
+      if (error.response?.status === 400) {
+        errorMessage = error.response?.data?.error || 'Esta solicitação não pode ser aceita no momento.';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'Solicitação não encontrada ou já foi aceita por outro parceiro.';
+      }
+      
+      Alert.alert('Erro', errorMessage);
     } finally {
       setAceitandoPedido(false);
     }
@@ -270,7 +187,7 @@ export default function AceitarSolicitacoesScreen() {
     fetchSolicitacoes();
   };
   
-  const formatarData = (dataString) => {
+  const formatarData = (dataString: string) => {
     if (!dataString) return 'Data não disponível';
     try {
       const data = new Date(dataString);
@@ -282,15 +199,35 @@ export default function AceitarSolicitacoesScreen() {
     }
   };
   
-  const handleSolicitacaoPress = (solicitacao) => {
+  const handleSolicitacaoPress = (solicitacao: ColetaPendente) => {
     if (!solicitacao) return;
     setSelectedSolicitacao(solicitacao);
     setModalVisible(true);
   };
   
-  const getMaterialIcon = (materialId) => {
+  const getMaterialIcon = (materialNome: string) => {
     const defaultIcon = { icon: "box", color: "#607D8B" };
-    return MATERIAL_ICONS[materialId] || defaultIcon;
+    return MATERIAL_ICONS[materialNome] || defaultIcon;
+  };
+  
+  // Função para formatar valores monetários de forma segura
+  const formatarValor = (valor: string | number | null | undefined): string => {
+    if (!valor && valor !== 0) return '0.00';
+    const numeroValor = typeof valor === 'string' ? parseFloat(valor) : valor;
+    return isNaN(numeroValor) ? '0.00' : numeroValor.toFixed(2);
+  };
+
+  // Função para formatar peso de forma segura
+  const formatarPeso = (peso: string | null | undefined): string => {
+    if (!peso) return '0.00';
+    const numeroPeso = parseFloat(peso);
+    return isNaN(numeroPeso) ? '0.00' : numeroPeso.toFixed(2);
+  };
+
+  // Função para formatar distância de forma segura
+  const formatarDistancia = (distancia: number | null | undefined): string => {
+    if (!distancia && distancia !== 0) return '0.0';
+    return isNaN(distancia) ? '0.0' : distancia.toFixed(1);
   };
   
   // Renderiza mensagem quando não há solicitações
@@ -300,7 +237,7 @@ export default function AceitarSolicitacoesScreen() {
       <Text style={styles.emptyTitle}>Nenhuma solicitação disponível</Text>
       <Text style={styles.emptyText}>
         No momento não há solicitações de coleta disponíveis para você.
-        {materiaisParceiro.length === 0 && '\n\nConfigure seus materiais de trabalho para ver mais solicitações.'}
+        {'\n\n'}Verifique se você possui materiais configurados em seu perfil.
       </Text>
       <TouchableOpacity 
         style={styles.refreshButton}
@@ -311,13 +248,11 @@ export default function AceitarSolicitacoesScreen() {
     </View>
   );
   
-  if (isLoading || loadingMateriais) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>
-          {loadingMateriais ? 'Carregando materiais...' : 'Buscando solicitações disponíveis...'}
-        </Text>
+        <Text style={styles.loadingText}>Buscando solicitações disponíveis...</Text>
       </View>
     );
   }
@@ -353,56 +288,68 @@ export default function AceitarSolicitacoesScreen() {
           renderEmptyList()
         ) : (
           solicitacoes.map((item) => {
-            const materialIcon = getMaterialIcon(item.material?.id);
+            const materialIcon = getMaterialIcon(item.material_nome);
             
             return (
               <TouchableOpacity
-                key={item.solicitacao.id}
+                key={item.id}
                 style={styles.solicitacaoCard}
                 onPress={() => handleSolicitacaoPress(item)}
               >
                 <View style={styles.cardHeader}>
                   <View style={[styles.materialIcon, { backgroundColor: materialIcon.color }]}>
-                    <Feather name={materialIcon.icon} size={20} color="#FFFFFF" />
+                    <Feather name={materialIcon.icon as any} size={20} color="#FFFFFF" />
                   </View>
                   <View style={styles.headerInfo}>
-                    <Text style={styles.materialNome}>{item.material?.nome || 'Material não especificado'}</Text>
+                    <Text style={styles.materialNome}>{item.material_nome || 'Material não especificado'}</Text>
                     <Text style={styles.solicitacaoData}>
-                      Solicitado em: {formatarData(item.solicitacao?.criado_em)}
+                      Solicitado em: {formatarData(item.criado_em)}
                     </Text>
                   </View>
-                  <View style={styles.distanciaContainer}>
-                    <Feather name="map-pin" size={14} color="#666666" />
-                    <Text style={styles.distanciaText}>{item.distancia} km</Text>
-                  </View>
+                  {item.distancia_km !== null && item.distancia_km !== undefined && (
+                    <View style={styles.distanciaContainer}>
+                      <Feather name="map-pin" size={14} color="#666666" />
+                      <Text style={styles.distanciaText}>{formatarDistancia(item.distancia_km)} km</Text>
+                    </View>
+                  )}
                 </View>
                 
                 <View style={styles.cardBody}>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Peso:</Text>
-                    <Text style={styles.infoValue}>{parseFloat(item.coleta?.peso_material || 0).toFixed(2)} kg</Text>
+                    <Text style={styles.infoValue}>{formatarPeso(item.peso_material)} kg</Text>
                   </View>
                   
+                  {item.quantidade_material && (
+                    <View style={styles.infoRow}>
+                      <Text style={styles.infoLabel}>Quantidade:</Text>
+                      <Text style={styles.infoValue}>
+                        {item.quantidade_material} {parseInt(String(item.quantidade_material)) > 1 ? 'itens' : 'item'}
+                      </Text>
+                    </View>
+                  )}
+                  
                   <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Quantidade:</Text>
-                    <Text style={styles.infoValue}>
-                      {item.coleta?.quantidade_material || 0} {parseInt(item.coleta?.quantidade_material || 0) > 1 ? 'itens' : 'item'}
-                    </Text>
+                    <Text style={styles.infoLabel}>Cliente:</Text>
+                    <Text style={styles.infoValue}>{item.cliente_nome || 'Nome não disponível'}</Text>
                   </View>
                   
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Endereço:</Text>
-                    <Text style={styles.infoValue} numberOfLines={1}>
-                      {item.endereco?.bairro || 'Endereço'}, {item.endereco?.cidade || 'não disponível'}
+                    <Text style={styles.infoValue} numberOfLines={2}>
+                      {item.endereco_completo || 'Endereço não disponível'}
                     </Text>
                   </View>
                 </View>
                 
                 <View style={styles.cardFooter}>
                   <Text style={styles.valorEstimado}>
-                    Ganho estimado: R$ {(parseFloat(item.coleta?.peso_material || 0) * parseFloat(item.material?.preco || 1)).toFixed(2)}
+                    Ganho: R$ {formatarValor(item.valor_pagamento)}
                   </Text>
-                  <TouchableOpacity style={styles.detalhesButton}>
+                  <TouchableOpacity 
+                    style={styles.detalhesButton}
+                    onPress={() => handleSolicitacaoPress(item)}
+                  >
                     <Text style={styles.detalhesButtonText}>Ver Detalhes</Text>
                   </TouchableOpacity>
                 </View>
@@ -442,18 +389,18 @@ export default function AceitarSolicitacoesScreen() {
                   <Text style={styles.modalSectionTitle}>Material</Text>
                   <View style={styles.materialDetail}>
                     <View style={[styles.materialIconLarge, { 
-                      backgroundColor: getMaterialIcon(selectedSolicitacao.material?.id).color 
+                      backgroundColor: getMaterialIcon(selectedSolicitacao.material_nome).color 
                     }]}>
                       <Feather 
-                        name={getMaterialIcon(selectedSolicitacao.material?.id).icon} 
+                        name={getMaterialIcon(selectedSolicitacao.material_nome).icon as any} 
                         size={32} 
                         color="#FFFFFF" 
                       />
                     </View>
                     <View style={styles.materialInfo}>
-                      <Text style={styles.materialNomeModal}>{selectedSolicitacao.material?.nome || 'Material não especificado'}</Text>
+                      <Text style={styles.materialNomeModal}>{selectedSolicitacao.material_nome || 'Material não especificado'}</Text>
                       <Text style={styles.materialDescricao}>
-                        {selectedSolicitacao.material?.descricao || 'Descrição não disponível'}
+                        Material reciclável para coleta seletiva
                       </Text>
                     </View>
                   </View>
@@ -461,21 +408,23 @@ export default function AceitarSolicitacoesScreen() {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Peso:</Text>
                     <Text style={styles.detailValue}>
-                      {parseFloat(selectedSolicitacao.coleta?.peso_material || 0).toFixed(2)} kg
+                      {formatarPeso(selectedSolicitacao.peso_material)} kg
                     </Text>
                   </View>
                   
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Quantidade:</Text>
-                    <Text style={styles.detailValue}>
-                      {selectedSolicitacao.coleta?.quantidade_material || 0} {parseInt(selectedSolicitacao.coleta?.quantidade_material || 0) > 1 ? 'itens' : 'item'}
-                    </Text>
-                  </View>
+                  {selectedSolicitacao.quantidade_material && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Quantidade:</Text>
+                      <Text style={styles.detailValue}>
+                        {selectedSolicitacao.quantidade_material} {parseInt(String(selectedSolicitacao.quantidade_material)) > 1 ? 'itens' : 'item'}
+                      </Text>
+                    </View>
+                  )}
                   
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Data:</Text>
                     <Text style={styles.detailValue}>
-                      {formatarData(selectedSolicitacao.solicitacao?.criado_em)}
+                      {formatarData(selectedSolicitacao.criado_em)}
                     </Text>
                   </View>
                 </View>
@@ -484,45 +433,33 @@ export default function AceitarSolicitacoesScreen() {
                   <Text style={styles.modalSectionTitle}>Endereço de Coleta</Text>
                   <View style={styles.enderecoDetail}>
                     <Feather name="map-pin" size={24} color="#4CAF50" style={styles.enderecoIcon} />
-                    <View>
+                    <View style={styles.enderecoTextos}>
                       <Text style={styles.enderecoTexto}>
-                        {selectedSolicitacao.endereco?.rua || 'Endereço não disponível'}, {selectedSolicitacao.endereco?.numero || 'S/N'}
+                        {selectedSolicitacao.endereco_completo || 'Endereço não disponível'}
                       </Text>
-                      <Text style={styles.enderecoTexto}>
-                        {selectedSolicitacao.endereco?.bairro || ''}
-                      </Text>
-                      <Text style={styles.enderecoTexto}>
-                        {selectedSolicitacao.endereco?.cidade || ''} - {selectedSolicitacao.endereco?.estado || ''}
-                      </Text>
-                      <Text style={styles.enderecoTexto}>
-                        CEP: {selectedSolicitacao.endereco?.cep || 'Não informado'}
-                      </Text>
-                      {selectedSolicitacao.endereco?.complemento && (
-                        <Text style={styles.enderecoTexto}>
-                          Complemento: {selectedSolicitacao.endereco.complemento}
-                        </Text>
-                      )}
                     </View>
                   </View>
                   
-                  <View style={styles.distanciaDetail}>
-                    <Feather name="navigation" size={16} color="#666666" />
-                    <Text style={styles.distanciaDetailText}>
-                      Aproximadamente {selectedSolicitacao.distancia} km de distância
-                    </Text>
-                  </View>
+                  {selectedSolicitacao.distancia_km !== null && selectedSolicitacao.distancia_km !== undefined && (
+                    <View style={styles.distanciaDetail}>
+                      <Feather name="navigation" size={16} color="#666666" />
+                      <Text style={styles.distanciaDetailText}>
+                        Aproximadamente {formatarDistancia(selectedSolicitacao.distancia_km)} km de distância
+                      </Text>
+                    </View>
+                  )}
                 </View>
                 
                 <View style={styles.modalSection}>
                   <Text style={styles.modalSectionTitle}>Cliente</Text>
-                  <Text style={styles.clienteNome}>{selectedSolicitacao.cliente?.usuario?.nome || 'Nome não disponível'}</Text>
+                  <Text style={styles.clienteNome}>{selectedSolicitacao.cliente_nome || 'Nome não disponível'}</Text>
                 </View>
                 
-                {selectedSolicitacao.solicitacao?.observacoes && (
+                {selectedSolicitacao.observacoes_solicitacao && (
                   <View style={styles.modalSection}>
                     <Text style={styles.modalSectionTitle}>Observações</Text>
                     <Text style={styles.observacoesText}>
-                      {selectedSolicitacao.solicitacao.observacoes}
+                      {selectedSolicitacao.observacoes_solicitacao}
                     </Text>
                   </View>
                 )}
@@ -530,7 +467,7 @@ export default function AceitarSolicitacoesScreen() {
                 <View style={styles.valorContainer}>
                   <Text style={styles.valorLabel}>Ganho estimado:</Text>
                   <Text style={styles.valorTotal}>
-                    R$ {(parseFloat(selectedSolicitacao.coleta?.peso_material || 0) * parseFloat(selectedSolicitacao.material?.preco || 1)).toFixed(2)}
+                    R$ {formatarValor(selectedSolicitacao.valor_pagamento)}
                   </Text>
                 </View>
                 
@@ -843,6 +780,9 @@ const styles = StyleSheet.create({
   enderecoIcon: {
     marginRight: 12,
     marginTop: 2,
+  },
+  enderecoTextos: {
+    flex: 1,
   },
   enderecoTexto: {
     fontSize: 14,

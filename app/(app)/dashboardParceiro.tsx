@@ -11,47 +11,71 @@ import {
   RefreshControl,
   Linking
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from '../context/UserContext';
 import axios from 'axios';
+import { useCallback } from 'react';
 
 // URL base da API
 import { API_BASE_URL } from '../configs'
 
+// Tipos para a nova estrutura da API
+interface ColetaParceiro {
+  id: number;
+  cliente_id: number;
+  cliente_nome: string;
+  parceiro_nome: string | null;
+  material_nome: string;
+  peso_material: string;
+  quantidade_material: string | number | null;
+  endereco_completo: string;
+  status_solicitacao: string;
+  observacoes_solicitacao: string | null;
+  status_pagamento: string;
+  valor_pagamento: string | number;
+  criado_em: string;
+  atualizado_em: string;
+  finalizado_em?: string;
+  imagens_coletas: any[];
+  // Dados adicionais do cliente
+  cliente_email?: string;
+  cliente_telefone?: string;
+}
+
 // Ícones e cores para cada material
-const MATERIAL_ICONS = {
-  1: { icon: "disc", color: "#607D8B" },       // Metal
-  2: { icon: "file", color: "#795548" },       // Papel
-  3: { icon: "pocket", color: "#FF9800" },     // Plástico
-  4: { icon: "aperture", color: "#00BCD4" },   // Vidro
-  5: { icon: "cpu", color: "#9C27B0" },        // Eletrônico
-  6: { icon: "coffee", color: "#8BC34A" },     // Resíduo Orgânico
-  7: { icon: "thermometer", color: "#F44336" } // Resíduo Hospitalar
+const MATERIAL_ICONS: { [key: string]: { icon: string, color: string } } = {
+  'Metal': { icon: "disc", color: "#607D8B" },
+  'Papel': { icon: "file", color: "#795548" },
+  'Plástico': { icon: "pocket", color: "#FF9800" },
+  'Vidro': { icon: "aperture", color: "#00BCD4" },
+  'Eletrônico': { icon: "cpu", color: "#9C27B0" },
+  'Resíduo Orgânico': { icon: "coffee", color: "#8BC34A" },
+  'Resíduo Hospitalar': { icon: "thermometer", color: "#F44336" }
 };
 
-// Mapa de status de solicitação
+// Status map para tradução e cores
 const STATUS_MAP = {
-  "1": { label: "Pendente", color: "#FFC107", icon: "clock" },
-  "2": { label: "Aprovado", color: "#2196F3", icon: "check-circle" },
-  "3": { label: "Em coleta", color: "#9C27B0", icon: "truck" },
-  "4": { label: "Finalizado", color: "#4CAF50", icon: "check" },
-  "5": { label: "Cancelado", color: "#F44336", icon: "x-circle" },
-  "6": { label: "Falha", color: "#FF5722", icon: "alert-triangle" },
+  // Estados de Solicitação
+  "pendente": { label: "Pendente", color: "#FFC107", icon: "clock" },
+  "aceitado": { label: "Aceito", color: "#2196F3", icon: "check-circle" },
+  "coletado": { label: "Coletado", color: "#FF9800", icon: "truck" },
+  "finalizado": { label: "Finalizado", color: "#4CAF50", icon: "check" },
+  "cancelado": { label: "Cancelado", color: "#F44336", icon: "x-circle" },
 };
 
 export default function DashboardPedidosScreen() {
   const { user } = useUser();
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [pedidos, setPedidos] = useState([]);
-  const [selectedPedido, setSelectedPedido] = useState(null);
+  const [pedidos, setPedidos] = useState<ColetaParceiro[]>([]);
+  const [selectedPedido, setSelectedPedido] = useState<ColetaParceiro | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [atualizandoStatus, setAtualizandoStatus] = useState(false);
   const [estatisticas, setEstatisticas] = useState({
-    emColeta: 0,
-    aprovados: 0,
+    emAndamento: 0,
+    aceitos: 0,
     finalizados: 0,
     pesoTotal: 0,
     ganhoTotal: 0
@@ -62,126 +86,71 @@ export default function DashboardPedidosScreen() {
     try {
       setIsLoading(true);
       
-      if (!user.user_id) {
+      if (!user?.user_id) {
         console.warn('ID do usuário não encontrado');
         setIsLoading(false);
         return;
       }
       
-      // Buscar coletas do parceiro
-      const coletasResponse = await axios.get(`${API_BASE_URL}/coletas?id_parceiros=${user.id}`);
+      console.log('Buscando coletas para parceiro:', user.user_id);
       
-      if (coletasResponse.data.length === 0) {
-        setIsLoading(false);
-        setRefreshing(false);
-        setPedidos([]);
-        setEstatisticas({
-          emColeta: 0,
-          aprovados: 0,
-          finalizados: 0,
-          pesoTotal: 0,
-          ganhoTotal: 0
-        });
-        return;
-      }
+      // Usar o novo endpoint da API
+      const response = await axios.get(`${API_BASE_URL}/coletas/minhas-coletas-parceiro/${user.user_id}/`);
       
-      // Para cada coleta, buscar os detalhes relacionados
-      const pedidosCompletos = await Promise.all(
-        coletasResponse.data.map(async (coleta) => {
-          try {
-            // Validação básica dos dados da coleta
-            if (!coleta || !coleta.id_materiais || !coleta.id_solicitacoes) {
-              console.warn('Dados de coleta inválidos:', coleta);
-              return null;
-            }
-
-            // Buscar material
-            const materialResponse = await axios.get(`${API_BASE_URL}/materiais/${coleta.id_materiais}`);
-            
-            // Buscar solicitação
-            const solicitacaoResponse = await axios.get(`${API_BASE_URL}/solicitacoes/${coleta.id_solicitacoes}`);
-            
-            // Buscar cliente
-            const clienteResponse = await axios.get(`${API_BASE_URL}/clientes/${coleta.id_clientes}`);
-            
-            // Buscar dados do usuário do cliente
-            const usuarioResponse = await axios.get(`${API_BASE_URL}/usuarios/${clienteResponse.data.id_usuarios}`);
-            
-            // Buscar endereço
-            const enderecoResponse = await axios.get(`${API_BASE_URL}/enderecos/${coleta.id_enderecos}`);
-            
-            // Buscar telefone do cliente (simulado, pois não está no banco de dados)
-            const telefone = "+5554" + Math.floor(Math.random() * 90000000 + 10000000);
-            
-            return {
-              coleta,
-              material: materialResponse.data || {},
-              solicitacao: solicitacaoResponse.data || {},
-              cliente: {
-                ...clienteResponse.data,
-                usuario: usuarioResponse.data || {},
-                telefone
-              },
-              endereco: enderecoResponse.data || {},
-              ganhoEstimado: parseFloat(coleta.peso_material || 0) * parseFloat(materialResponse.data?.preco || 1)
-            };
-          } catch (itemError) {
-            // Apenas para o vídeo
-            // console.error('Erro ao buscar detalhes de pedido individual:', itemError);
-            // Alert.alert('Erro', 'Você não possui pedidos pendentes');
-            return null;
-          }
-        })
-      );
-      
-      // Filtrar pedidos nulos
-      const pedidosValidos = pedidosCompletos.filter(pedido => pedido !== null);
+      console.log('Coletas recebidas:', response.data);
       
       // Ordenar pedidos por status e data
-      const pedidosOrdenados = pedidosValidos.sort((a, b) => {
+      const pedidosOrdenados = response.data.sort((a: ColetaParceiro, b: ColetaParceiro) => {
         // Primeiro, ordenar por prioridade de status
-        const prioridadeStatus = {
-          "3": 1, // Em coleta (prioridade máxima)
-          "2": 2, // Aprovado
-          "4": 3, // Finalizado
-          "6": 4, // Falha
-          "5": 5, // Cancelado (prioridade mínima)
-          "1": 6  // Pendente
+        const prioridadeStatus: { [key: string]: number } = {
+          "aceitado": 1,    // Aceito (prioridade máxima para parceiro)
+          "coletado": 2,    // Coletado 
+          "finalizado": 3,  // Finalizado
+          "cancelado": 4,   // Cancelado (prioridade mínima)
         };
         
-        const statusA = prioridadeStatus[a.solicitacao?.estado_solicitacao] || 99;
-        const statusB = prioridadeStatus[b.solicitacao?.estado_solicitacao] || 99;
+        const statusA = prioridadeStatus[a.status_solicitacao] || 99;
+        const statusB = prioridadeStatus[b.status_solicitacao] || 99;
         
         if (statusA !== statusB) {
           return statusA - statusB;
         }
         
         // Em caso de empate no status, ordenar por data (mais recente primeiro)
-        const dataA = new Date(a.coleta?.criado_em || 0);
-        const dataB = new Date(b.coleta?.criado_em || 0);
-        return dataB - dataA;
+        const dataA = new Date(a.criado_em || 0);
+        const dataB = new Date(b.criado_em || 0);
+        return dataB.getTime() - dataA.getTime();
       });
       
       setPedidos(pedidosOrdenados);
       
       // Calcular estatísticas
-      const stats = pedidosOrdenados.reduce((acc, pedido) => {
-        const status = pedido.solicitacao?.estado_solicitacao;
+      const stats = pedidosOrdenados.reduce((acc: {
+        emAndamento: number;
+        aceitos: number;
+        finalizados: number;
+        pesoTotal: number;
+        ganhoTotal: number;
+      }, pedido: ColetaParceiro) => {
+        const status = pedido.status_solicitacao;
         
-        if (status === "2") acc.aprovados++; // Aprovado
-        if (status === "3") acc.emColeta++;  // Em coleta
-        if (status === "4") acc.finalizados++; // Finalizado
+        if (status === "aceitado") acc.aceitos++; // Aceito
+        if (status === "coletado") acc.emAndamento++;  // Coletado (aguardando finalização)
+        if (status === "finalizado") acc.finalizados++; // Finalizado
         
         // Só considerar peso e ganho para pedidos não cancelados
-        if (status !== "5") {
-          acc.pesoTotal += parseFloat(pedido.coleta?.peso_material || 0);
-          acc.ganhoTotal += pedido.ganhoEstimado || 0;
+        if (status !== "cancelado") {
+          const peso = parseFloat(pedido.peso_material || '0');
+          const ganho = parseFloat(String(pedido.valor_pagamento) || '0');
+          
+          if (!isNaN(peso)) acc.pesoTotal += peso;
+          if (!isNaN(ganho)) acc.ganhoTotal += ganho;
         }
         
         return acc;
       }, {
-        emColeta: 0,
-        aprovados: 0,
+        emAndamento: 0,
+        aceitos: 0,
         finalizados: 0,
         pesoTotal: 0,
         ganhoTotal: 0
@@ -189,8 +158,8 @@ export default function DashboardPedidosScreen() {
       
       setEstatisticas(stats);
       
-    } catch (error) {
-      //('Erro ao buscar pedidos:', error.response?.data || error.message);
+    } catch (error: any) {
+      console.error('Erro ao buscar pedidos:', error.response?.data || error.message);
       Alert.alert('Erro', 'Não foi possível carregar seus pedidos. Verifique sua conexão e tente novamente.');
     } finally {
       setIsLoading(false);
@@ -201,33 +170,43 @@ export default function DashboardPedidosScreen() {
   // Carregar dados iniciais
   useEffect(() => {
     const loadPedidos = async () => {
-        if (!user.user_id) {
-            console.warn('ID do usuário não disponível ainda, aguardando...');
-            return;
-        }
+      if (!user?.user_id) {
+        console.warn('ID do usuário não disponível ainda, aguardando...');
+        setIsLoading(false);
+        return;
+      }
 
-        console.log('Carregando pedidos para user.id =', user.id);
+      console.log('Carregando pedidos para user_id =', user.user_id);
 
-        setIsLoading(true);
+      setIsLoading(true);
 
-        try {
-            await fetchPedidos();
-        } catch (error) {
-            console.error('Erro inesperado no loadPedidos:', error);
-        } finally {
-            setIsLoading(false);
-        }
+      try {
+        await fetchPedidos();
+      } catch (error) {
+        console.error('Erro inesperado no loadPedidos:', error);
+        setIsLoading(false);
+      }
     };
 
     loadPedidos();
-}, [user.user_id]); // ATENÇÃO → dependência direta de user.user_id
+  }, [user?.user_id]);
+  
+  // Recarregar dados quando a tela ganha foco (volta de outra tela)
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.user_id) {
+        console.log('Dashboard ganhou foco - recarregando pedidos');
+        fetchPedidos();
+      }
+    }, [user?.user_id])
+  );
   
   const onRefresh = () => {
     setRefreshing(true);
     fetchPedidos();
   };
   
-  const formatarData = (dataString) => {
+  const formatarData = (dataString: string) => {
     if (!dataString) return 'Data não disponível';
     try {
       const data = new Date(dataString);
@@ -239,34 +218,21 @@ export default function DashboardPedidosScreen() {
     }
   };
   
-  // Atualizar status da solicitação
-  const handleAtualizarStatus = async (novoStatus) => {
-    if (!selectedPedido?.solicitacao?.id) return;
+  const handleMarcarColetado = async () => {
+    if (!selectedPedido?.id) return;
     
     setAtualizandoStatus(true);
     
     try {
-      // Atualizar o status da solicitação
-      await axios.patch(`${API_BASE_URL}/solicitacoes/${selectedPedido.solicitacao.id}`, {
-        estado_solicitacao: novoStatus
-      });
+      // Usar o novo endpoint de marcar como coletado
+      await axios.post(`${API_BASE_URL}/coletas/${selectedPedido.id}/marcar-coletado/`);
       
-      // Se o status for "Finalizado", atualizar a data de finalização
-      if (novoStatus === "4") {
-        await axios.patch(`${API_BASE_URL}/solicitacoes/${selectedPedido.solicitacao.id}`, {
-          finalizado_em: new Date().toISOString()
-        });
-      }
-      
-      // Atualizar o pedido na lista local
+      // Atualizar a lista local
       setPedidos(pedidos.map(pedido => {
-        if (pedido.solicitacao?.id === selectedPedido.solicitacao.id) {
+        if (pedido.id === selectedPedido.id) {
           return {
             ...pedido,
-            solicitacao: {
-              ...pedido.solicitacao,
-              estado_solicitacao: novoStatus
-            }
+            status_solicitacao: "coletado"
           };
         }
         return pedido;
@@ -275,19 +241,16 @@ export default function DashboardPedidosScreen() {
       // Atualizar o pedido selecionado no modal
       setSelectedPedido({
         ...selectedPedido,
-        solicitacao: {
-          ...selectedPedido.solicitacao,
-          estado_solicitacao: novoStatus
-        }
+        status_solicitacao: "coletado"
       });
       
       // Atualizar estatísticas
       fetchPedidos();
       
-      Alert.alert('Sucesso', 'Status atualizado com sucesso!');
+      Alert.alert('Sucesso', 'Coleta marcada como realizada! Aguarde o cliente finalizar o processo.');
       
-    } catch (error) {
-      console.error('Erro ao atualizar status:', error.response?.data || error.message);
+    } catch (error: any) {
+      console.error('Erro ao marcar como coletado:', error.response?.data || error.message);
       Alert.alert('Erro', 'Não foi possível atualizar o status. Tente novamente.');
     } finally {
       setAtualizandoStatus(false);
@@ -295,42 +258,57 @@ export default function DashboardPedidosScreen() {
   };
   
   // Iniciar conversa no WhatsApp
-  const iniciarConversaWhatsApp = (telefone) => {
-    if (!telefone) {
-      Alert.alert('Erro', 'Telefone não disponível');
-      return;
-    }
+  const iniciarConversaWhatsApp = (telefone?: string) => {
+    const telefoneSimulado = telefone || "+5554" + Math.floor(Math.random() * 90000000 + 10000000);
     
     const mensagem = `Olá! Sou o parceiro de coleta da Green Cycle e estou entrando em contato sobre sua solicitação de coleta.`;
-    const url = `whatsapp://send?phone=${telefone}&text=${encodeURIComponent(mensagem)}`;
+    const url = `whatsapp://send?phone=${telefoneSimulado}&text=${encodeURIComponent(mensagem)}`;
     
     Linking.canOpenURL(url)
       .then((supported) => {
         if (supported) {
           return Linking.openURL(url);
         } else {
-          Alert.alert('Erro', 'WhatsApp não está instalado neste dispositivo.');
+          // Tentar abrir no navegador como fallback
+          const webUrl = `https://wa.me/${telefoneSimulado.replace('+', '')}?text=${encodeURIComponent(mensagem)}`;
+          return Linking.openURL(webUrl);
         }
       })
       .catch((err) => {
         console.error('Erro ao abrir WhatsApp:', err);
-        Alert.alert('Erro', 'Não foi possível abrir o WhatsApp.');
+        Alert.alert('Erro', 'Não foi possível abrir o WhatsApp. Verifique se o aplicativo está instalado.');
       });
   };
   
-  const handlePedidoPress = (pedido) => {
+  const handlePedidoPress = (pedido: ColetaParceiro) => {
     if (!pedido) return;
     setSelectedPedido(pedido);
     setModalVisible(true);
   };
   
-  const getStatusInfo = (statusCode) => {
-    return STATUS_MAP[statusCode] || { label: "Desconhecido", color: "#9E9E9E", icon: "help-circle" };
+  const getStatusInfo = (statusCode: string) => {
+    // Normalizar o status para garantir correspondência
+    const normalizedStatus = statusCode ? statusCode.toLowerCase().trim() : '';
+    return STATUS_MAP[normalizedStatus as keyof typeof STATUS_MAP] || { label: statusCode || "Desconhecido", color: "#9E9E9E", icon: "help-circle" };
   };
   
-  const getMaterialIcon = (materialId) => {
+  const getMaterialIcon = (materialNome: string) => {
     const defaultIcon = { icon: "box", color: "#607D8B" };
-    return MATERIAL_ICONS[materialId] || defaultIcon;
+    return MATERIAL_ICONS[materialNome] || defaultIcon;
+  };
+
+  // Função para formatar valores monetários de forma segura
+  const formatarValor = (valor: string | number | null | undefined): string => {
+    if (!valor && valor !== 0) return '0.00';
+    const numeroValor = typeof valor === 'string' ? parseFloat(valor) : valor;
+    return isNaN(numeroValor) ? '0.00' : numeroValor.toFixed(2);
+  };
+
+  // Função para formatar peso de forma segura
+  const formatarPeso = (peso: string | null | undefined): string => {
+    if (!peso) return '0.00';
+    const numeroPeso = parseFloat(peso);
+    return isNaN(numeroPeso) ? '0.00' : numeroPeso.toFixed(2);
   };
   
   // Renderiza mensagem quando não há pedidos
@@ -379,7 +357,7 @@ export default function DashboardPedidosScreen() {
       </TouchableOpacity>
       
       <View style={styles.header}>
-        <Text style={styles.title}>Dashboard de Pedidos</Text>
+        <Text style={styles.title}>Dashboard de Coletas</Text>
         <Text style={styles.subtitle}>
           Gerencie suas coletas em andamento
         </Text>
@@ -388,20 +366,20 @@ export default function DashboardPedidosScreen() {
       <View style={styles.statsContainer}>
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{estatisticas.emColeta + estatisticas.aprovados}</Text>
-            <Text style={styles.statLabel}>Coletas Pendentes</Text>
+            <Text style={styles.statValue}>{estatisticas.aceitos}</Text>
+            <Text style={styles.statLabel}>Para Coletar</Text>
           </View>
           
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{estatisticas.finalizados}</Text>
-            <Text style={styles.statLabel}>Coletas Concluídas</Text>
+            <Text style={styles.statValue}>{estatisticas.emAndamento}</Text>
+            <Text style={styles.statLabel}>Aguardando Finalização</Text>
           </View>
         </View>
         
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{estatisticas.pesoTotal.toFixed(2)}kg</Text>
-            <Text style={styles.statLabel}>Material Coletado</Text>
+            <Text style={styles.statValue}>{estatisticas.finalizados}</Text>
+            <Text style={styles.statLabel}>Coletas Finalizadas</Text>
           </View>
           
           <View style={styles.statCard}>
@@ -418,77 +396,115 @@ export default function DashboardPedidosScreen() {
           renderEmptyList()
         ) : (
           pedidos.map((pedido) => {
-            const statusInfo = getStatusInfo(pedido.solicitacao?.estado_solicitacao);
-            const materialIcon = getMaterialIcon(pedido.material?.id);
+            const statusInfo = getStatusInfo(pedido.status_solicitacao);
+            const materialIcon = getMaterialIcon(pedido.material_nome);
             
             return (
               <TouchableOpacity
-                key={pedido.coleta?.id}
+                key={pedido.id}
                 style={styles.pedidoCard}
                 onPress={() => handlePedidoPress(pedido)}
               >
                 <View style={styles.cardHeader}>
                   <View style={[styles.statusIcon, { backgroundColor: statusInfo.color }]}>
-                    <Feather name={statusInfo.icon} size={16} color="#FFFFFF" />
+                    <Feather name={statusInfo.icon as any} size={16} color="#FFFFFF" />
                   </View>
                   <Text style={styles.statusText}>{statusInfo.label}</Text>
-                  <Text style={styles.pedidoId}>#{pedido.coleta?.id}</Text>
+                  <Text style={styles.pedidoId}>#{pedido.id}</Text>
                 </View>
                 
                 <View style={styles.cardBody}>
                   <View style={styles.materialRow}>
                     <View style={[styles.materialIcon, { backgroundColor: materialIcon.color }]}>
-                      <Feather name={materialIcon.icon} size={20} color="#FFFFFF" />
+                      <Feather name={materialIcon.icon as any} size={20} color="#FFFFFF" />
                     </View>
                     <View style={styles.materialInfo}>
-                      <Text style={styles.materialNome}>{pedido.material?.nome || 'Material não especificado'}</Text>
+                      <Text style={styles.materialNome}>{pedido.material_nome || 'Material não especificado'}</Text>
                       <Text style={styles.materialDetalhes}>
-                        {parseFloat(pedido.coleta?.peso_material || 0).toFixed(2)} kg - {pedido.coleta?.quantidade_material || 0} {parseInt(pedido.coleta?.quantidade_material || 0) > 1 ? 'itens' : 'item'}
+                        {formatarPeso(pedido.peso_material)} kg
+                        {pedido.quantidade_material && ` - ${pedido.quantidade_material} ${parseInt(String(pedido.quantidade_material)) > 1 ? 'itens' : 'item'}`}
                       </Text>
                     </View>
                   </View>
                   
                   <View style={styles.infoRow}>
                     <Feather name="user" size={16} color="#666666" />
-                    <Text style={styles.infoText}>{pedido.cliente?.usuario?.nome || 'Cliente não especificado'}</Text>
+                    <Text style={styles.infoText}>{pedido.cliente_nome || 'Cliente não especificado'}</Text>
                   </View>
                   
                   <View style={styles.infoRow}>
                     <Feather name="map-pin" size={16} color="#666666" />
                     <Text style={styles.infoText} numberOfLines={1}>
-                      {pedido.endereco?.bairro || 'Endereço'}, {pedido.endereco?.cidade || 'não disponível'}
+                      {pedido.endereco_completo || 'Endereço não disponível'}
                     </Text>
                   </View>
                   
                   <View style={styles.infoRow}>
                     <Feather name="calendar" size={16} color="#666666" />
                     <Text style={styles.infoText}>
-                      {formatarData(pedido.coleta?.criado_em)}
+                      {formatarData(pedido.criado_em)}
                     </Text>
                   </View>
                 </View>
                 
                 <View style={styles.cardFooter}>
                   <Text style={styles.valorEstimado}>
-                    Ganho: R$ {(pedido.ganhoEstimado || 0).toFixed(2)}
+                    Ganho: R$ {formatarValor(pedido.valor_pagamento)}
                   </Text>
                   
-                  {pedido.solicitacao?.estado_solicitacao === "2" && (
+                  {pedido.status_solicitacao === "aceitado" && (
                     <TouchableOpacity 
-                      style={styles.iniciarButton}
-                      onPress={() => handlePedidoPress(pedido)}
+                      style={styles.coletarButton}
+                      onPress={() => {
+                        Alert.alert(
+                          'Marcar como Coletado',
+                          'Confirma que você realizou a coleta deste material?',
+                          [
+                            { text: 'Cancelar', style: 'cancel' },
+                            { 
+                              text: 'Confirmar', 
+                              onPress: async () => {
+                                setAtualizandoStatus(true);
+                                try {
+                                  await axios.post(`${API_BASE_URL}/coletas/${pedido.id}/marcar-coletado/`);
+                                  await fetchPedidos(); // Recarregar dados
+                                  Alert.alert('Sucesso', 'Coleta marcada como realizada! Aguarde o cliente finalizar o processo.');
+                                } catch (error: any) {
+                                  console.error('Erro ao marcar como coletado:', error);
+                                  Alert.alert('Erro', 'Não foi possível atualizar o status. Tente novamente.');
+                                } finally {
+                                  setAtualizandoStatus(false);
+                                }
+                              }
+                            }
+                          ]
+                        );
+                      }}
+                      disabled={atualizandoStatus}
                     >
-                      <Text style={styles.iniciarButtonText}>Iniciar Coleta</Text>
+                      {atualizandoStatus ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Feather name="check" size={14} color="#FFFFFF" />
+                          <Text style={styles.coletarButtonText}>Marcar Coletado</Text>
+                        </>
+                      )}
                     </TouchableOpacity>
                   )}
                   
-                  {pedido.solicitacao?.estado_solicitacao === "3" && (
-                    <TouchableOpacity 
-                      style={styles.finalizarButton}
-                      onPress={() => handlePedidoPress(pedido)}
-                    >
-                      <Text style={styles.finalizarButtonText}>Finalizar</Text>
-                    </TouchableOpacity>
+                  {pedido.status_solicitacao === "coletado" && (
+                    <View style={styles.aguardandoContainer}>
+                      <Feather name="clock" size={14} color="#FFFFFF" />
+                      <Text style={styles.aguardandoText}>Aguardando cliente</Text>
+                    </View>
+                  )}
+
+                  {pedido.status_solicitacao === "finalizado" && (
+                    <View style={styles.finalizadoContainer}>
+                      <Feather name="check-circle" size={14} color="#FFFFFF" />
+                      <Text style={styles.finalizadoText}>Finalizado</Text>
+                    </View>
                   )}
                 </View>
               </TouchableOpacity>
@@ -512,7 +528,7 @@ export default function DashboardPedidosScreen() {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Detalhes do Pedido #{selectedPedido?.coleta?.id}</Text>
+              <Text style={styles.modalTitle}>Detalhes da Coleta #{selectedPedido?.id}</Text>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
@@ -523,27 +539,27 @@ export default function DashboardPedidosScreen() {
             
             {selectedPedido && (
               <ScrollView style={styles.modalBody}>
-                <View style={[styles.statusBanner, { backgroundColor: getStatusInfo(selectedPedido.solicitacao?.estado_solicitacao).color }]}>
-                  <Feather name={getStatusInfo(selectedPedido.solicitacao?.estado_solicitacao).icon} size={24} color="#FFFFFF" />
-                  <Text style={styles.statusBannerText}>{getStatusInfo(selectedPedido.solicitacao?.estado_solicitacao).label}</Text>
+                <View style={[styles.statusBanner, { backgroundColor: getStatusInfo(selectedPedido.status_solicitacao).color }]}>
+                  <Feather name={getStatusInfo(selectedPedido.status_solicitacao).icon as any} size={24} color="#FFFFFF" />
+                  <Text style={styles.statusBannerText}>{getStatusInfo(selectedPedido.status_solicitacao).label}</Text>
                 </View>
                 
                 <View style={styles.modalSection}>
                   <Text style={styles.modalSectionTitle}>Material</Text>
                   <View style={styles.materialDetail}>
                     <View style={[styles.materialIconLarge, { 
-                      backgroundColor: getMaterialIcon(selectedPedido.material?.id).color 
+                      backgroundColor: getMaterialIcon(selectedPedido.material_nome).color 
                     }]}>
                       <Feather 
-                        name={getMaterialIcon(selectedPedido.material?.id).icon} 
+                        name={getMaterialIcon(selectedPedido.material_nome).icon as any} 
                         size={32} 
                         color="#FFFFFF" 
                       />
                     </View>
                     <View style={styles.materialInfoModal}>
-                      <Text style={styles.materialNomeModal}>{selectedPedido.material?.nome || 'Material não especificado'}</Text>
+                      <Text style={styles.materialNomeModal}>{selectedPedido.material_nome || 'Material não especificado'}</Text>
                       <Text style={styles.materialDescricao}>
-                        {selectedPedido.material?.descricao || 'Descrição não disponível'}
+                        Material reciclável para coleta seletiva
                       </Text>
                     </View>
                   </View>
@@ -551,21 +567,23 @@ export default function DashboardPedidosScreen() {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Peso:</Text>
                     <Text style={styles.detailValue}>
-                      {parseFloat(selectedPedido.coleta?.peso_material || 0).toFixed(2)} kg
+                      {formatarPeso(selectedPedido.peso_material)} kg
                     </Text>
                   </View>
                   
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Quantidade:</Text>
-                    <Text style={styles.detailValue}>
-                      {selectedPedido.coleta?.quantidade_material || 0} {parseInt(selectedPedido.coleta?.quantidade_material || 0) > 1 ? 'itens' : 'item'}
-                    </Text>
-                  </View>
+                  {selectedPedido.quantidade_material && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Quantidade:</Text>
+                      <Text style={styles.detailValue}>
+                        {selectedPedido.quantidade_material} {parseInt(String(selectedPedido.quantidade_material)) > 1 ? 'itens' : 'item'}
+                      </Text>
+                    </View>
+                  )}
                   
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Data:</Text>
                     <Text style={styles.detailValue}>
-                      {formatarData(selectedPedido.coleta?.criado_em)}
+                      {formatarData(selectedPedido.criado_em)}
                     </Text>
                   </View>
                 </View>
@@ -575,15 +593,19 @@ export default function DashboardPedidosScreen() {
                   <View style={styles.clienteDetail}>
                     <Feather name="user" size={24} color="#4CAF50" style={styles.clienteIcon} />
                     <View>
-                      <Text style={styles.clienteNome}>{selectedPedido.cliente?.usuario?.nome || 'Nome não disponível'}</Text>
-                      <Text style={styles.clienteEmail}>{selectedPedido.cliente?.usuario?.email || 'Email não disponível'}</Text>
-                      <Text style={styles.clienteTelefone}>{selectedPedido.cliente?.telefone || 'Telefone não disponível'}</Text>
+                      <Text style={styles.clienteNome}>{selectedPedido.cliente_nome || 'Nome não disponível'}</Text>
+                      {selectedPedido.cliente_email && (
+                        <Text style={styles.clienteEmail}>{selectedPedido.cliente_email}</Text>
+                      )}
+                      <Text style={styles.clienteTelefone}>
+                        {selectedPedido.cliente_telefone || `+5554${Math.floor(Math.random() * 90000000 + 10000000)}`}
+                      </Text>
                     </View>
                   </View>
                   
                   <TouchableOpacity
                     style={styles.whatsappButton}
-                    onPress={() => iniciarConversaWhatsApp(selectedPedido.cliente?.telefone)}
+                    onPress={() => iniciarConversaWhatsApp(selectedPedido.cliente_telefone)}
                   >
                     <FontAwesome5 name="whatsapp" size={20} color="#FFFFFF" />
                     <Text style={styles.whatsappButtonText}>Contatar pelo WhatsApp</Text>
@@ -596,31 +618,17 @@ export default function DashboardPedidosScreen() {
                     <Feather name="map-pin" size={24} color="#4CAF50" style={styles.enderecoIcon} />
                     <View>
                       <Text style={styles.enderecoTexto}>
-                        {selectedPedido.endereco?.rua || 'Endereço não disponível'}, {selectedPedido.endereco?.numero || 'S/N'}
+                        {selectedPedido.endereco_completo || 'Endereço não disponível'}
                       </Text>
-                      <Text style={styles.enderecoTexto}>
-                        {selectedPedido.endereco?.bairro || ''}
-                      </Text>
-                      <Text style={styles.enderecoTexto}>
-                        {selectedPedido.endereco?.cidade || ''} - {selectedPedido.endereco?.estado || ''}
-                      </Text>
-                      <Text style={styles.enderecoTexto}>
-                        CEP: {selectedPedido.endereco?.cep || 'Não informado'}
-                      </Text>
-                      {selectedPedido.endereco?.complemento && (
-                        <Text style={styles.enderecoTexto}>
-                          Complemento: {selectedPedido.endereco.complemento}
-                        </Text>
-                      )}
                     </View>
                   </View>
                   
                   <TouchableOpacity
                     style={styles.mapaButton}
                     onPress={() => {
-                      const latitude = selectedPedido.endereco?.latitude || 0;
-                      const longitude = selectedPedido.endereco?.longitude || 0;
-                      const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`;
+                      // Como não temos coordenadas específicas, usar busca por endereço
+                      const enderecoEncoded = encodeURIComponent(selectedPedido.endereco_completo || '');
+                      const url = `https://www.google.com/maps/search/?api=1&query=${enderecoEncoded}`;
                       Linking.openURL(url);
                     }}
                   >
@@ -629,44 +637,27 @@ export default function DashboardPedidosScreen() {
                   </TouchableOpacity>
                 </View>
                 
-                {selectedPedido.solicitacao?.observacoes && (
+                {selectedPedido.observacoes_solicitacao && (
                   <View style={styles.modalSection}>
                     <Text style={styles.modalSectionTitle}>Observações</Text>
                     <Text style={styles.observacoesText}>
-                      {selectedPedido.solicitacao.observacoes}
+                      {selectedPedido.observacoes_solicitacao}
                     </Text>
                   </View>
                 )}
                 
                 <View style={styles.valorContainer}>
-                  <Text style={styles.valorLabel}>Ganho estimado:</Text>
+                  <Text style={styles.valorLabel}>Ganho:</Text>
                   <Text style={styles.valorTotal}>
-                    R$ {(selectedPedido.ganhoEstimado || 0).toFixed(2)}
+                    R$ {formatarValor(selectedPedido.valor_pagamento)}
                   </Text>
                 </View>
                 
                 {/* Botões de ação baseados no status atual */}
-                {selectedPedido.solicitacao?.estado_solicitacao === "2" && (
+                {selectedPedido.status_solicitacao === "aceitado" && (
                   <TouchableOpacity
                     style={styles.acaoButton}
-                    onPress={() => handleAtualizarStatus("3")}
-                    disabled={atualizandoStatus}
-                  >
-                    {atualizandoStatus ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <Feather name="truck" size={18} color="#FFFFFF" />
-                        <Text style={styles.acaoButtonText}>Iniciar Coleta</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
-                
-                {selectedPedido.solicitacao?.estado_solicitacao === "3" && (
-                  <TouchableOpacity
-                    style={styles.acaoButton}
-                    onPress={() => handleAtualizarStatus("4")}
+                    onPress={handleMarcarColetado}
                     disabled={atualizandoStatus}
                   >
                     {atualizandoStatus ? (
@@ -674,27 +665,24 @@ export default function DashboardPedidosScreen() {
                     ) : (
                       <>
                         <Feather name="check-circle" size={18} color="#FFFFFF" />
-                        <Text style={styles.acaoButtonText}>Finalizar Coleta</Text>
+                        <Text style={styles.acaoButtonText}>Marcar como Coletado</Text>
                       </>
                     )}
                   </TouchableOpacity>
                 )}
-                
-                {["2", "3"].includes(selectedPedido.solicitacao?.estado_solicitacao) && (
-                  <TouchableOpacity
-                    style={styles.cancelarButton}
-                    onPress={() => handleAtualizarStatus("5")}
-                    disabled={atualizandoStatus}
-                  >
-                    {atualizandoStatus ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <Feather name="x-circle" size={18} color="#FFFFFF" />
-                        <Text style={styles.cancelarButtonText}>Cancelar Coleta</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+
+                {selectedPedido.status_solicitacao === "coletado" && (
+                  <View style={styles.aguardandoContainerModal}>
+                    <Feather name="clock" size={18} color="#FF9800" />
+                    <Text style={styles.aguardandoTextModal}>Aguardando cliente finalizar a coleta</Text>
+                  </View>
+                )}
+
+                {selectedPedido.status_solicitacao === "finalizado" && (
+                  <View style={styles.finalizadoContainerModal}>
+                    <Feather name="check-circle" size={18} color="#4CAF50" />
+                    <Text style={styles.finalizadoTextModal}>Coleta finalizada com sucesso!</Text>
+                  </View>
                 )}
               </ScrollView>
             )}
@@ -704,6 +692,7 @@ export default function DashboardPedidosScreen() {
     </ScrollView>
   );
 }
+
 // Definição de estilos
 const styles = StyleSheet.create({
   container: {
@@ -876,28 +865,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Medium',
     color: '#4CAF50',
   },
-  iniciarButton: {
+  coletarButton: {
     backgroundColor: '#2196F3',
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 4,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  iniciarButtonText: {
+  coletarButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: 'Roboto-Medium',
   },
-  finalizarButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-  },
-  finalizarButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'Roboto-Medium',
-  },
+
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1145,19 +1127,62 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Roboto-Medium',
   },
-  cancelarButton: {
-    backgroundColor: '#F44336',
+  aguardandoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF9800',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    gap: 4,
+  },
+  aguardandoText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'Roboto-Medium',
+  },
+  finalizadoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    gap: 4,
+  },
+  finalizadoText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: 'Roboto-Medium',
+  },
+  aguardandoContainerModal: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: 12,
     borderRadius: 8,
-    marginBottom: 16,
-    gap: 8,
+    backgroundColor: '#FF9800',
+    marginTop: 16,
   },
-  cancelarButtonText: {
+  aguardandoTextModal: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'Roboto-Medium',
+    marginLeft: 8,
   },
-});
+  finalizadoContainerModal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#4CAF50',
+    marginTop: 16,
+  },
+  finalizadoTextModal: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Roboto-Medium',
+    marginLeft: 8,
+  },
+ });

@@ -13,6 +13,7 @@ export default function AppLayout() {
       <Stack.Screen name="video_parceiro" />
       <Stack.Screen name="profile" />
       <Stack.Screen name="profile_parceiro" />
+      <Stack.Screen name="address_register" />
     </Stack>
   );
 }

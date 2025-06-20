@@ -10,105 +10,106 @@ import {
   Alert,
   RefreshControl
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from '../context/UserContext';
 import axios from 'axios';
+import { useCallback } from 'react';
 
 // URL base da API
 import { API_BASE_URL } from '../configs'
 
+// Tipos para a nova estrutura da API
+interface ColetaCompleta {
+  id: number;
+  cliente_id: number;
+  cliente_nome: string;
+  parceiro_nome: string | null;
+  material_nome: string;
+  peso_material: string;
+  quantidade_material: string | null;
+  endereco_completo: string;
+  status_solicitacao: string;
+  observacoes_solicitacao: string | null;
+  status_pagamento: string;
+  valor_pagamento: string;
+  criado_em: string;
+  atualizado_em: string;
+  finalizado_em?: string;
+  imagens_coletas: any[];
+}
+
 // Status map para tradução e cores
 const STATUS_MAP = {
-  "1": { label: "Pendente", color: "#FFC107", icon: { lib: Feather, name: "clock" } },
-  "2": { label: "Aprovado", color: "#2196F3", icon: { lib: Feather, name: "info" } },
-  "3": { label: "Em coleta", color: "#9C27B0", icon: { lib: Feather, name: "info" } },
-  "4": { label: "Finalizado", color: "#4CAF50", icon: { lib: Feather, name: "check" } },
-  "5": { label: "Cancelado", color: "#F44336", icon: { lib: Feather, name: "x" } },
-  "6": { label: "Falha", color: "#FF5722", icon: { lib: Feather, name: "alert-triangle" } },
+  // Estados de Solicitação
+  "pendente": { label: "Pendente", color: "#FFC107", icon: { lib: Feather, name: "clock" } },
+  "aceitado": { label: "Aceito", color: "#2196F3", icon: { lib: Feather, name: "check-circle" } },
+  "coletado": { label: "Coletado", color: "#FF9800", icon: { lib: Feather, name: "truck" } },
+  "finalizado": { label: "Finalizado", color: "#4CAF50", icon: { lib: Feather, name: "check" } },
+  "cancelado": { label: "Cancelado", color: "#F44336", icon: { lib: Feather, name: "x" } },
 };
 
 export default function HistoricoColetasScreen() {
   const { user } = useUser();
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [coletas, setColetas] = useState([]);
-  const [selectedColeta, setSelectedColeta] = useState(null);
+  const [coletas, setColetas] = useState<ColetaCompleta[]>([]);
+  const [selectedColeta, setSelectedColeta] = useState<ColetaCompleta | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [cancelLoading, setCancelLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [userType, setUserType] = useState<'cliente' | 'parceiro' | null>(null);
+  
+  // Determinar tipo de usuário baseado nas propriedades disponíveis
+  useEffect(() => {
+    if (user) {
+      if (user.client_id) {
+        setUserType('cliente');
+      } else if (user.partner_id) {
+        setUserType('parceiro');
+      }
+    }
+  }, [user]);
   
   const fetchColetas = async () => {
     try {
-      if (!user?.id) {
-        console.warn('ID do usuário não encontrado');
+      if (!user?.user_id || !userType) {
+        console.warn('ID do usuário ou tipo não encontrado');
         setIsLoading(false);
         return;
       }
 
-      // Buscando coletas do cliente
-      const response = await axios.get(`${API_BASE_URL}/coletas?id_clientes=${user.id}`);
-      
-      // Para cada coleta, buscar os detalhes relacionados
-      const coletasDetalhadas = await Promise.all(
-        response.data.map(async (coleta) => {
-          try {
-            // Validação básica dos dados da coleta
-            if (!coleta || !coleta.id_materiais || !coleta.id_solicitacoes) {
-              console.warn('Dados de coleta inválidos:', coleta);
-              return null;
-            }
+      console.log('Buscando coletas para user_id:', user.user_id, 'tipo:', userType);
 
-            // Buscar material
-            const materialResponse = await axios.get(`${API_BASE_URL}/materiais/${coleta.id_materiais}`);
-            
-            // Buscar solicitação
-            const solicitacaoResponse = await axios.get(`${API_BASE_URL}/solicitacoes/${coleta.id_solicitacoes}`);
-            
-            // Buscar endereço
-            const enderecoResponse = await axios.get(`${API_BASE_URL}/enderecos/${coleta.id_enderecos}`);
-            
-            // Buscar pagamento
-            const pagamentoResponse = await axios.get(`${API_BASE_URL}/pagamentos/${coleta.id_pagamentos}`);
-            
-            // Combinar todos os dados
-            return {
-              ...coleta,
-              material: materialResponse.data || {},
-              solicitacao: solicitacaoResponse.data || {},
-              endereco: enderecoResponse.data || {},
-              pagamento: pagamentoResponse.data || {},
-            };
-          } catch (itemError) {
-            console.error('Erro ao buscar detalhes de coleta individual:', itemError);
-            return null;
-          }
-        })
-      );
+      let response;
       
-      // Filtrar coletas nulas
-      const coletasValidas = coletasDetalhadas.filter(coleta => coleta !== null);
+      // Usar endpoint correto baseado no tipo de usuário
+      if (userType === 'cliente') {
+        response = await axios.get(`${API_BASE_URL}/coletas/minhas-coletas-cliente/${user.user_id}/`);
+      } else if (userType === 'parceiro') {
+        response = await axios.get(`${API_BASE_URL}/coletas/minhas-coletas-parceiro/${user.user_id}/`);
+      } else {
+        throw new Error('Tipo de usuário não identificado');
+      }
+      
+      console.log('Coletas recebidas:', response.data);
       
       // Ordenar primeiro por prioridade de status, depois por data de criação
-      const getPrioridade = (status) => {
-        if (!status) return 99;
-        const prioridades = {
-          "3": 1, // Em coleta (maior prioridade)
-          "1": 2, // Pendente
-          "2": 3, // Aprovado
-          "6": 4, // Falha
-          "4": 5, // Finalizado
-          "5": 6, // Cancelado (menor prioridade)
+      const getPrioridade = (status: string) => {
+        const prioridades: { [key: string]: number } = {
+          "pendente": 1,     // Pendente (maior prioridade)
+          "aceitado": 2,     // Aceito
+          "coletado": 3,     // Coletado
+          "finalizado": 4,   // Finalizado
+          "cancelado": 5,    // Cancelado (menor prioridade)
         };
         return prioridades[status] || 99;
       };
-      
-      const coletasOrdenadas = coletasValidas.sort((a, b) => {
+              
+      const coletasOrdenadas = response.data.sort((a: ColetaCompleta, b: ColetaCompleta) => {
         // Primeiro ordenar por prioridade de status
-        const statusA = a.solicitacao?.estado_solicitacao;
-        const statusB = b.solicitacao?.estado_solicitacao;
-        const prioridadeA = getPrioridade(statusA);
-        const prioridadeB = getPrioridade(statusB);
+        const prioridadeA = getPrioridade(a.status_solicitacao);
+        const prioridadeB = getPrioridade(b.status_solicitacao);
         
         if (prioridadeA !== prioridadeB) {
           return prioridadeA - prioridadeB;
@@ -117,11 +118,11 @@ export default function HistoricoColetasScreen() {
         // Se o status for o mesmo, ordenar por data (mais recente primeiro)
         const dataA = new Date(a.criado_em || 0);
         const dataB = new Date(b.criado_em || 0);
-        return dataB - dataA;
+        return dataB.getTime() - dataA.getTime();
       });
       
       setColetas(coletasOrdenadas);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao buscar coletas:', error.response?.data || error.message);
       Alert.alert('Erro', 'Não foi possível carregar seu histórico de coletas. Verifique sua conexão e tente novamente.');
     } finally {
@@ -132,14 +133,14 @@ export default function HistoricoColetasScreen() {
 
   useEffect(() => {
     const loadColetas = async () => {
-      // Verifica se o usuário está disponível
-      if (!user?.id) {
-        console.warn('Usuário não disponível ainda');
-        setIsLoading(false); // Importante: não manter em loading se não tem usuário
+      // Verifica se o usuário e tipo estão disponíveis
+      if (!user?.user_id || !userType) {
+        console.warn('Usuário ou tipo não disponível ainda');
+        setIsLoading(false);
         return;
       }
   
-      console.log('Carregando coletas para user.id =', user.id);
+      console.log('Carregando coletas para user_id =', user.user_id, 'tipo =', userType);
   
       setIsLoading(true);
   
@@ -147,7 +148,7 @@ export default function HistoricoColetasScreen() {
         await fetchColetas();
       } catch (error) {
         console.error('Erro inesperado no loadColetas:', error);
-        setIsLoading(false); // Garante que o loading é desativado em caso de erro
+        setIsLoading(false);
         Alert.alert('Erro', 'Não foi possível carregar as coletas. Tente novamente.');
       }
     };
@@ -155,44 +156,48 @@ export default function HistoricoColetasScreen() {
     // Adiciona um timeout de segurança
     const timeoutId = setTimeout(() => {
       loadColetas();
-    }, 0);
+    }, 100);
   
     // Limpeza do timeout se o componente desmontar
     return () => clearTimeout(timeoutId);
-  }, [user?.id]);  // Corrigido para user?.id
-
+  }, [user?.user_id, userType]);
 
   const onRefresh = () => {
     setRefreshing(true);
     fetchColetas();
   };
 
-  const handleColetaPress = (coleta) => {
+  const handleColetaPress = (coleta: ColetaCompleta) => {
     if (!coleta) return;
     setSelectedColeta(coleta);
     setModalVisible(true);
   };
 
   const handleCancelarColeta = async () => {
-    if (!selectedColeta || !selectedColeta.solicitacao) return;
+    if (!selectedColeta) return;
     
-    // Verificar se a solicitação está pendente
-    if (selectedColeta.solicitacao.estado_solicitacao !== "1") {
+    // Verificar se a coleta pode ser cancelada (pendente)
+    if (selectedColeta.status_solicitacao !== "pendente") {
       Alert.alert(
         'Não é possível cancelar', 
-        'Apenas solicitações pendentes podem ser canceladas.'
+        'Apenas coletas pendentes podem ser canceladas.'
       );
       return;
     }
     
-    setCancelLoading(true);
+    if (selectedColeta.status_pagamento !== "pendente") {
+      Alert.alert(
+        'Não é possível cancelar', 
+        'Apenas coletas com pagamento pendente podem ser canceladas.'
+      );
+      return;
+    }
+    
+    setActionLoading(true);
     
     try {
-      // Atualizar o status da solicitação para "Cancelado"
-      await axios.patch(
-        `${API_BASE_URL}/solicitacoes/${selectedColeta.id_solicitacoes}`,
-        { estado_solicitacao: "5" }  // 5 = Cancelado
-      );
+      // Usar o novo endpoint de cancelamento
+      await axios.post(`${API_BASE_URL}/coletas/${selectedColeta.id}/cancelar-coleta/`);
       
       // Atualizar a lista de coletas
       await fetchColetas();
@@ -201,16 +206,58 @@ export default function HistoricoColetasScreen() {
       setModalVisible(false);
       setSelectedColeta(null);
       
-      Alert.alert('Sucesso', 'Sua solicitação foi cancelada com sucesso.');
-    } catch (error) {
-      console.error('Erro ao cancelar solicitação:', error.response?.data || error.message);
-      Alert.alert('Erro', 'Não foi possível cancelar sua solicitação. Tente novamente.');
+      Alert.alert('Sucesso', 'Sua coleta foi cancelada com sucesso.');
+    } catch (error: any) {
+      console.error('Erro ao cancelar coleta:', error.response?.data || error.message);
+      Alert.alert('Erro', 'Não foi possível cancelar sua coleta. Tente novamente.');
     } finally {
-      setCancelLoading(false);
+      setActionLoading(false);
     }
   };
 
-  const formatarData = (dataString) => {
+  const handleFinalizarColeta = async () => {
+    if (!selectedColeta) return;
+    
+    // Verificar se a coleta pode ser finalizada (coletado)
+    if (selectedColeta.status_solicitacao !== "coletado") {
+      Alert.alert(
+        'Não é possível finalizar', 
+        'Apenas coletas já coletadas podem ser finalizadas.'
+      );
+      return;
+    }
+    
+    if (selectedColeta.status_pagamento !== "pendente") {
+      Alert.alert(
+        'Não é possível finalizar', 
+        'Apenas coletas com pagamento pendente podem ser finalizadas.'
+      );
+      return;
+    }
+    
+    setActionLoading(true);
+    
+    try {
+      // Usar o novo endpoint de finalização
+      await axios.post(`${API_BASE_URL}/coletas/${selectedColeta.id}/finalizar-coleta/`);
+      
+      // Atualizar a lista de coletas
+      await fetchColetas();
+      
+      // Fechar o modal
+      setModalVisible(false);
+      setSelectedColeta(null);
+      
+      Alert.alert('Sucesso', 'Sua coleta foi finalizada com sucesso. O pagamento foi processado.');
+    } catch (error: any) {
+      console.error('Erro ao finalizar coleta:', error.response?.data || error.message);
+      Alert.alert('Erro', 'Não foi possível finalizar sua coleta. Tente novamente.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const formatarData = (dataString: string) => {
     if (!dataString) return 'Data não disponível';
     try {
       const data = new Date(dataString);
@@ -222,17 +269,20 @@ export default function HistoricoColetasScreen() {
     }
   };
   
-  const renderStatusBadge = (status) => {
-    const statusInfo = STATUS_MAP[status] || { 
-      label: "Desconhecido", 
+  const renderStatusBadge = (status: string) => {
+    // Normalizar o status para garantir correspondência
+    const normalizedStatus = status ? status.toLowerCase().trim() : '';
+    
+    const statusInfo = STATUS_MAP[normalizedStatus as keyof typeof STATUS_MAP] || { 
+      label: status || "Desconhecido", 
       color: "#9E9E9E", 
-      icon: Info 
+      icon: { lib: Feather, name: "help-circle" as any }
     };
-    const StatusIcon = statusInfo.icon;
+    const StatusIcon = statusInfo.icon.lib;
     
     return (
       <View style={[styles.statusBadge, { backgroundColor: statusInfo.color }]}>
-        <StatusIcon size={14} color="#FFFFFF" />
+        <StatusIcon name={statusInfo.icon.name as any} size={14} color="#FFFFFF" />
         <Text style={styles.statusText}>{statusInfo.label}</Text>
       </View>
     );
@@ -242,17 +292,32 @@ export default function HistoricoColetasScreen() {
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
       <FontAwesome5 name="leaf" size={60} color="#E0E0E0" />
-      <Text style={styles.emptyTitle}>Nenhuma solicitação</Text>
+      <Text style={styles.emptyTitle}>Nenhuma coleta</Text>
       <Text style={styles.emptyText}>
-        Você ainda não realizou nenhuma solicitação de coleta.
+        {userType === 'cliente' 
+          ? 'Você ainda não realizou nenhuma solicitação de coleta.'
+          : 'Você ainda não aceitou nenhuma solicitação de coleta.'
+        }
       </Text>
       <TouchableOpacity 
         style={styles.createButton}
-        onPress={() => router.push('/(app)/request')}
+        onPress={() => router.push(userType === 'cliente' ? '/(app)/request' : '/(app)/aceitarSolicitacaoParceiro')}
       >
-        <Text style={styles.createButtonText}>Criar Nova Solicitação</Text>
+        <Text style={styles.createButtonText}>
+          {userType === 'cliente' ? 'Criar Nova Solicitação' : 'Buscar Solicitações'}
+        </Text>
       </TouchableOpacity>
     </View>
+  );
+
+  // Recarregar dados quando a tela ganha foco (volta de outra tela)
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.user_id && userType) {
+        console.log('Tela ganhou foco - recarregando coletas');
+        fetchColetas();
+      }
+    }, [user?.user_id, userType])
   );
 
   if (isLoading) {
@@ -284,9 +349,14 @@ export default function HistoricoColetasScreen() {
       </TouchableOpacity>
       
       <View style={styles.header}>
-        <Text style={styles.title}>Meus Pedidos</Text>
+        <Text style={styles.title}>
+          {userType === 'cliente' ? 'Minhas Coletas' : 'Coletas Aceitas'}
+        </Text>
         <Text style={styles.subtitle}>
-          Acompanhe o status das suas solicitações de coleta
+          {userType === 'cliente' 
+            ? 'Acompanhe o status das suas solicitações de coleta'
+            : 'Gerencie as coletas que você aceitou'
+          }
         </Text>
       </View>
       
@@ -302,19 +372,27 @@ export default function HistoricoColetasScreen() {
                 onPress={() => handleColetaPress(coleta)}
               >
                 <View style={styles.coletaHeader}>
-                  <Text style={styles.coletaId}>Pedido #{coleta.id}</Text>
-                  {renderStatusBadge(coleta.solicitacao?.estado_solicitacao)}
+                  <Text style={styles.coletaId}>Coleta #{coleta.id}</Text>
+                  {renderStatusBadge(coleta.status_solicitacao)}
                 </View>
                 
                 <View style={styles.coletaInfo}>
                   <Text style={styles.coletaInfoLabel}>Material:</Text>
-                  <Text style={styles.coletaInfoValue}>{coleta.material?.nome || 'Material não especificado'}</Text>
+                  <Text style={styles.coletaInfoValue}>{coleta.material_nome || 'Material não especificado'}</Text>
                 </View>
                 
                 <View style={styles.coletaInfo}>
-                  <Text style={styles.coletaInfoLabel}>Quantidade:</Text>
+                  <Text style={styles.coletaInfoLabel}>Peso:</Text>
                   <Text style={styles.coletaInfoValue}>
-                    {parseFloat(coleta.peso_material || 0).toFixed(2)} kg ({coleta.quantidade_material || 0} itens)
+                    {parseFloat(coleta.peso_material || '0').toFixed(2)} kg
+                    {coleta.quantidade_material && ` (${coleta.quantidade_material} itens)`}
+                  </Text>
+                </View>
+                
+                <View style={styles.coletaInfo}>
+                  <Text style={styles.coletaInfoLabel}>Endereço:</Text>
+                  <Text style={styles.coletaInfoValue} numberOfLines={2}>
+                    {coleta.endereco_completo || 'Endereço não disponível'}
                   </Text>
                 </View>
                 
@@ -324,20 +402,34 @@ export default function HistoricoColetasScreen() {
                     {formatarData(coleta.criado_em)}
                   </Text>
                 </View>
+
+                {coleta.parceiro_nome && (
+                  <View style={styles.coletaInfo}>
+                    <Text style={styles.coletaInfoLabel}>Parceiro:</Text>
+                    <Text style={styles.coletaInfoValue}>{coleta.parceiro_nome}</Text>
+                  </View>
+                )}
                 
                 <View style={styles.coletaFooter}>
                   <Text style={styles.coletaValor}>
-                    Valor estimado: R$ {(parseFloat(coleta.peso_material || 0) * parseFloat(coleta.material?.preco || 1)).toFixed(2)}
+                    Valor: R$ {parseFloat(coleta.valor_pagamento || '0').toFixed(2)}
                   </Text>
+                  <View style={styles.statusContainer}>
+                    <Text style={[styles.statusLabel, { color: STATUS_MAP[coleta.status_pagamento as keyof typeof STATUS_MAP]?.color || "#666" }]}>
+                      Pagamento: {coleta.status_pagamento}
+                    </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
             ))}
             
             <TouchableOpacity 
               style={styles.newButton}
-              onPress={() => router.push('/(app)/request')} 
+              onPress={() => router.push(userType === 'cliente' ? '/(app)/request' : '/(app)/aceitarSolicitacaoParceiro')} 
             >
-              <Text style={styles.newButtonText}>Nova Solicitação</Text>
+              <Text style={styles.newButtonText}>
+                {userType === 'cliente' ? 'Nova Solicitação' : 'Buscar Solicitações'}
+              </Text>
             </TouchableOpacity>
           </>
         )}
@@ -348,7 +440,7 @@ export default function HistoricoColetasScreen() {
         <Text style={styles.footerText}>Green Cycle</Text>
       </View>
       
-      {/* Modal de detalhes do pedido */}
+      {/* Modal de detalhes da coleta */}
       <Modal
         visible={modalVisible}
         transparent
@@ -358,7 +450,7 @@ export default function HistoricoColetasScreen() {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Detalhes do Pedido</Text>
+              <Text style={styles.modalTitle}>Detalhes da Coleta</Text>
               <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
@@ -372,13 +464,13 @@ export default function HistoricoColetasScreen() {
                 <View style={styles.modalSection}>
                   <Text style={styles.modalSectionTitle}>Informações Gerais</Text>
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Pedido #:</Text>
+                    <Text style={styles.detailLabel}>Coleta #:</Text>
                     <Text style={styles.detailValue}>{selectedColeta.id}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Status:</Text>
                     <View style={styles.detailValue}>
-                      {renderStatusBadge(selectedColeta.solicitacao?.estado_solicitacao)}
+                      {renderStatusBadge(selectedColeta.status_solicitacao)}
                     </View>
                   </View>
                   <View style={styles.detailRow}>
@@ -387,71 +479,125 @@ export default function HistoricoColetasScreen() {
                       {formatarData(selectedColeta.criado_em)}
                     </Text>
                   </View>
+                  {selectedColeta.finalizado_em && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Finalizado:</Text>
+                      <Text style={styles.detailValue}>
+                        {formatarData(selectedColeta.finalizado_em)}
+                      </Text>
+                    </View>
+                  )}
                 </View>
                 
                 <View style={styles.modalSection}>
                   <Text style={styles.modalSectionTitle}>Material</Text>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Tipo:</Text>
-                    <Text style={styles.detailValue}>{selectedColeta.material?.nome || 'Não especificado'}</Text>
+                    <Text style={styles.detailValue}>{selectedColeta.material_nome || 'Não especificado'}</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Peso:</Text>
                     <Text style={styles.detailValue}>
-                      {parseFloat(selectedColeta.peso_material || 0).toFixed(2)} kg
+                      {parseFloat(selectedColeta.peso_material || '0').toFixed(2)} kg
                     </Text>
                   </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Quantidade:</Text>
-                    <Text style={styles.detailValue}>
-                      {selectedColeta.quantidade_material || 0} itens
-                    </Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Preço/kg:</Text>
-                    <Text style={styles.detailValue}>
-                      R$ {parseFloat(selectedColeta.material?.preco || 1).toFixed(2)}
-                    </Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Valor total:</Text>
-                    <Text style={[styles.detailValue, styles.valorTotal]}>
-                      R$ {(parseFloat(selectedColeta.peso_material || 0) * parseFloat(selectedColeta.material?.preco || 1)).toFixed(2)}
-                    </Text>
-                  </View>
+                  {selectedColeta.quantidade_material && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Quantidade:</Text>
+                      <Text style={styles.detailValue}>
+                        {selectedColeta.quantidade_material} itens
+                      </Text>
+                    </View>
+                  )}
                 </View>
                 
                 <View style={styles.modalSection}>
                   <Text style={styles.modalSectionTitle}>Endereço de Coleta</Text>
                   <Text style={styles.enderecoText}>
-                    {selectedColeta.endereco?.rua || 'Endereço não disponível'}, {selectedColeta.endereco?.numero || 'S/N'}{'\n'}
-                    {selectedColeta.endereco?.bairro || ''}{'\n'}
-                    {selectedColeta.endereco?.cidade || ''} - {selectedColeta.endereco?.estado || ''}{'\n'}
-                    CEP: {selectedColeta.endereco?.cep || 'Não informado'}
+                    {selectedColeta.endereco_completo || 'Endereço não disponível'}
                   </Text>
                 </View>
-                
-                {selectedColeta.solicitacao?.observacoes && (
+
+                {selectedColeta.parceiro_nome && (
                   <View style={styles.modalSection}>
-                    <Text style={styles.modalSectionTitle}>Observações</Text>
-                    <Text style={styles.observacoesText}>
-                      {selectedColeta.solicitacao.observacoes}
+                    <Text style={styles.modalSectionTitle}>Parceiro</Text>
+                    <Text style={styles.parceiroText}>
+                      {selectedColeta.parceiro_nome}
                     </Text>
                   </View>
                 )}
                 
-                {selectedColeta.solicitacao?.estado_solicitacao === "1" && (
+                {selectedColeta.observacoes_solicitacao && (
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>Observações</Text>
+                    <Text style={styles.observacoesText}>
+                      {selectedColeta.observacoes_solicitacao}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Pagamento</Text>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Valor:</Text>
+                    <Text style={[styles.detailValue, styles.valorTotal]}>
+                      R$ {parseFloat(selectedColeta.valor_pagamento || '0').toFixed(2)}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Status:</Text>
+                    <Text style={[styles.detailValue, { 
+                      color: STATUS_MAP[selectedColeta.status_pagamento as keyof typeof STATUS_MAP]?.color || "#666",
+                      fontWeight: 'bold'
+                    }]}>
+                      {selectedColeta.status_pagamento}
+                    </Text>
+                  </View>
+                </View>
+                
+                {/* Botões de ação baseados no status e tipo de usuário */}
+                {userType === 'cliente' && selectedColeta.status_solicitacao === "pendente" && 
+                 selectedColeta.status_pagamento === "pendente" && (
                   <TouchableOpacity 
                     style={styles.cancelButton}
                     onPress={handleCancelarColeta}
-                    disabled={cancelLoading}
+                    disabled={actionLoading}
                   >
-                    {cancelLoading ? (
+                    {actionLoading ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                      <Text style={styles.cancelButtonText}>Cancelar Solicitação</Text>
+                      <Text style={styles.cancelButtonText}>Cancelar Coleta</Text>
                     )}
                   </TouchableOpacity>
+                )}
+
+                {userType === 'cliente' && selectedColeta.status_solicitacao === "coletado" && 
+                 selectedColeta.status_pagamento === "pendente" && (
+                  <TouchableOpacity 
+                    style={styles.finalizeButton}
+                    onPress={handleFinalizarColeta}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.finalizeButtonText}>Finalizar Coleta</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {/* Informações para parceiros */}
+                {userType === 'parceiro' && (
+                  <View style={styles.parceiroInfo}>
+                    <Text style={styles.parceiroInfoText}>
+                      Status: {STATUS_MAP[selectedColeta.status_solicitacao as keyof typeof STATUS_MAP]?.label || selectedColeta.status_solicitacao}
+                    </Text>
+                    {selectedColeta.status_solicitacao === "coletado" && (
+                      <Text style={styles.parceiroInfoText}>
+                        Aguardando cliente finalizar a coleta
+                      </Text>
+                    )}
+                  </View>
                 )}
               </ScrollView>
             )}
@@ -724,5 +870,51 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontFamily: 'Roboto-Medium',
-  }
+  },
+  finalizeButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  finalizeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Medium',
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusLabel: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Medium',
+    color: '#666666',
+  },
+  parceiroText: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#333333',
+    lineHeight: 22,
+  },
+  parceiroInfo: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  parceiroInfoText: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#333333',
+    lineHeight: 22,
+  },
 });

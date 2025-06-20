@@ -14,25 +14,47 @@ import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from '../context/UserContext';
+import { API_BASE_URL } from '../configs'; 
 import axios from 'axios';
 
-// URL base da API
-const API_BASE_URL = 'http://192.168.0.103:8000/v1';
+interface Material {
+  id: number;
+  nome: string;
+}
+
+interface Endereco {
+  id: number;
+  rua: string;
+  numero?: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+  cep: string;
+  complemento?: string;
+}
+
+interface FormData {
+  id_materiais: number | '';
+  peso_material: string;
+  quantidade_material: string;
+  id_enderecos: number | '';
+  observacoes: string;
+}
 
 export default function SolicitarColetaScreen() {
   const { user } = useUser();
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [materiais, setMateriais] = useState([]);
-  const [enderecos, setEnderecos] = useState([]);
+  const [materiais, setMateriais] = useState<Material[]>([]);
+  const [enderecos, setEnderecos] = useState<Endereco[]>([]);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [countdownValue, setCountdownValue] = useState(5);
   const [isCountdownActive, setIsCountdownActive] = useState(false);
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     id_materiais: '',
     peso_material: '',
-    quantidade_material: '1',
+    quantidade_material: '',
     id_enderecos: '',
     observacoes: ''
   });
@@ -42,18 +64,13 @@ export default function SolicitarColetaScreen() {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Definir materiais estaticamente conforme solicitado
-        setMateriais([
-          { id: 1, nome: 'Metal' },
-          { id: 2, nome: 'Papel' },
-          { id: 3, nome: 'Plástico' },
-          { id: 4, nome: 'Vidro' },
-          { id: 5, nome: 'Eletrônico' },
-        ]);
+        // Buscar materiais da API
+        const materiaisResponse = await axios.get(`${API_BASE_URL}/materiais`);
+        setMateriais(materiaisResponse.data);
         
         // Buscar endereços do usuário
-        if (user?.id) {
-          const enderecosResponse = await axios.get(`${API_BASE_URL}/enderecos?id_usuarios=${user.id_usuarios}`);
+        if (user?.client_id) {
+          const enderecosResponse = await axios.get(`${API_BASE_URL}/enderecos?id_usuarios=${user.client_id}`);
           setEnderecos(enderecosResponse.data);
           
           // Verificar se o usuário não tem endereços cadastrados
@@ -80,7 +97,7 @@ export default function SolicitarColetaScreen() {
 
   // Gerenciar o countdown
   useEffect(() => {
-    let intervalId;
+    let intervalId: ReturnType<typeof setInterval>;
     
     if (isCountdownActive && countdownValue > 0) {
       intervalId = setInterval(() => {
@@ -103,16 +120,37 @@ export default function SolicitarColetaScreen() {
     }
   }, [confirmVisible]);
 
-  const handleChange = (name, value) => {
+  const handleChange = (name: keyof FormData, value: string | number) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSelectMaterial = (materialId) => {
+  const handleSelectMaterial = (materialId: number) => {
     setFormData(prev => ({ ...prev, id_materiais: materialId }));
   };
 
-  const handleSelectEndereco = (enderecoId) => {
+  const handleSelectEndereco = (enderecoId: number) => {
     setFormData(prev => ({ ...prev, id_enderecos: enderecoId }));
+  };
+
+  // Função para converter vírgula para ponto
+  const handlePesoChange = (value: string) => {
+    // Converter vírgula para ponto
+    const valorConvertido = value.replace(',', '.');
+    handleChange('peso_material', valorConvertido);
+    
+    // Se preencheu peso, limpar quantidade
+    if (valorConvertido && parseFloat(valorConvertido) > 0) {
+      setFormData(prev => ({ ...prev, quantidade_material: '' }));
+    }
+  };
+
+  const handleQuantidadeChange = (value: string) => {
+    handleChange('quantidade_material', value);
+    
+    // Se preencheu quantidade, limpar peso
+    if (value && parseInt(value) > 0) {
+      setFormData(prev => ({ ...prev, peso_material: '' }));
+    }
   };
 
   const handleConfirmShow = () => {
@@ -122,87 +160,134 @@ export default function SolicitarColetaScreen() {
       return;
     }
     
-    if (!formData.peso_material) {
-      Alert.alert('Erro', 'Por favor, informe o peso do material.');
+    // Validação: aceitar apenas peso OU quantidade (não ambos)
+    const temPeso = formData.peso_material && parseFloat(formData.peso_material) > 0;
+    const temQuantidade = formData.quantidade_material && parseInt(formData.quantidade_material) > 0;
+    
+    if (!temPeso && !temQuantidade) {
+      Alert.alert('Erro', 'Por favor, informe pelo menos o peso ou a quantidade.');
       return;
     }
     
-    // if (!formData.id_enderecos) {
-    //   Alert.alert('Erro', 'Por favor, selecione um endereço para coleta.');
-    //   return;
-    // }
+    if (temPeso && temQuantidade) {
+      Alert.alert('Erro', 'Por favor, informe apenas o peso OU a quantidade (não ambos).');
+      return;
+    }
+    
+    if (!formData.id_enderecos) {
+      Alert.alert(
+        'Erro', 
+        'Por favor, selecione um endereço para coleta.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { 
+            text: 'Cadastrar Endereço', 
+            onPress: () => router.push('/(app)/address_register' as any) 
+          }
+        ]
+      );
+      return;
+    }
 
     setConfirmVisible(true);
     setIsCountdownActive(true);
   };
 
   const handleSubmit = async () => {
+    if (!user?.client_id) {
+      Alert.alert('Erro', 'Dados do usuário não encontrados.');
+      return;
+    }
+
     setIsSending(true);
     
-    // try {
-    //   // 1. Criar pagamento
-    //   const pagamentoResponse = await axios.post(`${API_BASE_URL}/pagamentos`, {
-    //     valor_pagamento: 0,
-    //     saldo_pagamento: 0,
-    //     estado_pagamento: "1" // Pendente
-    //   });
-
-    //   // 2. Criar solicitação
-    //   const solicitacaoResponse = await axios.post(`${API_BASE_URL}/solicitacoes`, {
-    //     estado_solicitacao: "1", // Pendente
-    //     observacoes: formData.observacoes || null,
-    //     latitude: 0, // Seria obtido do endereço ou GPS
-    //     longitude: 0 // Seria obtido do endereço ou GPS
-    //   });
-
-    //   // 3. Criar coleta
-    //   await axios.post(`${API_BASE_URL}/coletas`, {
-    //     id_clientes: user.id,
-    //     id_parceiros: null, // Será atribuído posteriormente
-    //     id_materiais: formData.id_materiais,
-    //     peso_material: formData.peso_material,
-    //     quantidade_material: formData.quantidade_material,
-    //     id_enderecos: formData.id_enderecos,
-    //     id_solicitacoes: solicitacaoResponse.data.id,
-    //     id_pagamentos: pagamentoResponse.data.id
-    //   });
-
-    //   // Limpar formulário e fechar modal
-    //   setFormData({
-    //     id_materiais: '',
-    //     peso_material: '',
-    //     quantidade_material: '1',
-    //     id_enderecos: '',
-    //     observacoes: ''
-    //   });
+    try {
+      // Novo formato da API - criar coleta diretamente
+      // Apenas peso OU quantidade, nunca ambos
+      const temPeso = formData.peso_material && parseFloat(formData.peso_material) > 0;
+      const temQuantidade = formData.quantidade_material && parseInt(formData.quantidade_material) > 0;
       
-    //   setConfirmVisible(false);
-      
-    //   // Mostrar mensagem de sucesso
-    //   Alert.alert(
-    //     'Solicitação Enviada',
-    //     'Sua solicitação de coleta foi registrada com sucesso!',
-    //     [{ text: 'OK', onPress: () => router.back() }]
-    //   );
-      
-    // } catch (error) {
-    //   console.error('Erro ao enviar solicitação:', error);
-    //   Alert.alert('Erro', 'Não foi possível enviar sua solicitação de coleta. Tente novamente.');
-    // } finally {
-    //   setIsSending(false);
-    // }
+      const coletaData: any = {
+        id_clientes: user.client_id,
+        id_materiais: Number(formData.id_materiais),
+        id_enderecos: Number(formData.id_enderecos),
+        dados_solicitacao: {
+          observacoes: formData.observacoes || null
+        },
+        dados_pagamento: {
+          valor_pagamento: "0.00", // Será calculado no backend
+          saldo_pagamento: "0.00"
+        }
+      };
 
-    Alert.alert('Erro', 'Não foi possível enviar sua solicitação de coleta. Tente novamente.');
-    setIsSending(false);
+      // Adicionar apenas peso OU quantidade
+      if (temPeso) {
+        coletaData.peso_material = parseFloat(formData.peso_material).toFixed(4);
+      } else if (temQuantidade) {
+        coletaData.quantidade_material = parseInt(formData.quantidade_material);
+      }
+
+      console.log('Enviando coleta:', coletaData);
+
+      const response = await axios.post(`${API_BASE_URL}/coletas/`, coletaData);
+
+      console.log('Coleta criada:', response.data);
+
+      // Limpar formulário e fechar modal
+      setFormData({
+        id_materiais: '',
+        peso_material: '',
+        quantidade_material: '',
+        id_enderecos: '',
+        observacoes: ''
+      });
+      
+      setConfirmVisible(false);
+      
+      // Mostrar mensagem de sucesso
+      Alert.alert(
+        'Solicitação Enviada',
+        'Sua solicitação de coleta foi registrada com sucesso! Em breve um parceiro entrará em contato.',
+        [{ 
+          text: 'OK', 
+          onPress: () => {
+            // Verificar se veio do histórico e recarregar
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.push('/(app)/home' as any);
+            }
+          }
+        }]
+      );
+      
+    } catch (error: any) {
+      console.error('Erro ao enviar solicitação:', error.response?.data || error.message);
+      
+      // Mensagem de erro mais específica
+      let errorMessage = 'Não foi possível enviar sua solicitação de coleta.';
+      
+      if (error.response?.status === 400) {
+        errorMessage += ' Verifique se todos os dados estão corretos.';
+      } else if (error.response?.status === 500) {
+        errorMessage += ' Erro no servidor. Tente novamente mais tarde.';
+      } else {
+        errorMessage += ' Verifique sua conexão e tente novamente.';
+      }
+      
+      Alert.alert('Erro', errorMessage);
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const getMaterialNome = (id) => {
-    const material = materiais.find(m => m.id === id);
+  const getMaterialNome = (id: number | string) => {
+    const material = materiais.find(m => m.id === Number(id));
     return material ? material.nome : '';
   };
 
-  const getEnderecoString = (id) => {
-    const endereco = enderecos.find(e => e.id === parseInt(id));
+  const getEnderecoString = (id: number | string) => {
+    const endereco = enderecos.find(e => e.id === Number(id));
     if (!endereco) return '';
     
     return `${endereco.rua}, ${endereco.numero || 'S/N'} - ${endereco.bairro}, ${endereco.cidade}`;
@@ -260,22 +345,26 @@ export default function SolicitarColetaScreen() {
         
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Peso estimado (kg) *</Text>
+          <Text style={styles.helperText}>Informe apenas o peso OU a quantidade abaixo</Text>
           <TextInput
             style={styles.input}
             value={formData.peso_material}
-            onChangeText={(value) => handleChange('peso_material', value)}
+            onChangeText={handlePesoChange}
             placeholder="Ex: 5.5"
+            placeholderTextColor="#999999"
             keyboardType="numeric"
           />
         </View>
         
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Quantidade de itens</Text>
+          <Text style={styles.helperText}>Alternativa ao peso (não preencha ambos)</Text>
           <TextInput
             style={styles.input}
             value={formData.quantidade_material}
-            onChangeText={(value) => handleChange('quantidade_material', value)}
+            onChangeText={handleQuantidadeChange}
             placeholder="Ex: 10"
+            placeholderTextColor="#999999"
             keyboardType="number-pad"
           />
         </View>
@@ -311,6 +400,15 @@ export default function SolicitarColetaScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+          {enderecos.length === 0 && (
+            <TouchableOpacity
+              style={styles.addAddressButton}
+              onPress={() => router.push('/(app)/address_register' as any)}
+            >
+              <Feather name="plus" size={20} color="#4CAF50" />
+              <Text style={styles.addAddressText}>Cadastrar Novo Endereço</Text>
+            </TouchableOpacity>
+          )}
         </View>
         
         <View style={styles.inputGroup}>
@@ -320,6 +418,7 @@ export default function SolicitarColetaScreen() {
             value={formData.observacoes}
             onChangeText={(value) => handleChange('observacoes', value)}
             placeholder="Informações adicionais para a coleta"
+            placeholderTextColor="#999999"
             multiline
             numberOfLines={4}
             textAlignVertical="top"
@@ -517,6 +616,12 @@ const styles = StyleSheet.create({
     color: '#333333',
     marginBottom: 8,
   },
+  helperText: {
+    fontSize: 12,
+    fontFamily: 'Roboto-Regular',
+    color: '#666666',
+    marginBottom: 8,
+  },
   input: {
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
@@ -693,5 +798,23 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontFamily: 'Roboto-Medium',
+  },
+  addAddressButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    borderStyle: 'dashed',
+  },
+  addAddressText: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Medium',
+    color: '#4CAF50',
+    marginLeft: 8,
   },
 });

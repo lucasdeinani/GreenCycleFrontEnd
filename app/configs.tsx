@@ -1,4 +1,4 @@
-export const API_BASE_URL = 'http://192.168.0.86:8000/v1';
+export const API_BASE_URL = 'http://10.0.0.162:8000/v1';
 export const APP_NAME = 'Green Cycle';
 
 export const MATERIALS = [
@@ -9,7 +9,8 @@ export const MATERIALS = [
     { id: 5, nome: 'Eletrônico' },
     { id: 6, nome: 'Resíduo Orgânico' },
     { id: 7, nome: 'Resíduo Hospitalar' },
-  ] as const;
+] as const;
+
   
 // Tipos úteis
 export type MaterialId = typeof MATERIALS[number]['id'];
@@ -24,7 +25,7 @@ export const getMaterialByName = (name: string) =>
 
 // Lista de materiais para exibição no cadastro (apenas os permitidos)
 export const REGISTER_MATERIALS = MATERIALS.filter(m => 
-  ['Metal', 'Papel', 'Plástico', 'Resíduo Orgânico', 'Resíduo Hospitalar'].includes(m.nome)
+    ['Metal', 'Papel', 'Plástico', 'Resíduo Orgânico', 'Resíduo Hospitalar', 'Eletrônico', 'Vidro'].includes(m.nome)
 );
 
 export default function Config() {

@@ -461,7 +461,7 @@ export default function RegisterScreen() {
                 </View>
 
                 <TouchableOpacity
-                    style={[styles.registerButton, isLoading && styles.buttonDisabled]}
+                    style={[styles.registerButton, isLoading && styles.buttonDisabled, { marginBottom: 35 }]}
                     onPress={handleSubmit}
                     disabled={isLoading}
                 >

@@ -52,6 +52,7 @@ export default function AceitarSolicitacoesScreen() {
   const [selectedSolicitacao, setSelectedSolicitacao] = useState<ColetaPendente | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [aceitandoPedido, setAceitandoPedido] = useState(false);
+  const [atualizandoLista, setAtualizandoLista] = useState(false);
   
   // Buscar solicitações disponíveis para o parceiro
   const fetchSolicitacoes = async () => {
@@ -158,8 +159,14 @@ export default function AceitarSolicitacoesScreen() {
           },
           {
             text: 'Continuar',
-            onPress: () => {
-              fetchSolicitacoes(); // Recarregar a lista de solicitações
+            onPress: async () => {
+              setAtualizandoLista(true);
+              try {
+                await new Promise(resolve => setTimeout(resolve, 500)); // Delay visual
+                await fetchSolicitacoes(); // Recarregar a lista de solicitações
+              } finally {
+                setAtualizandoLista(false);
+              }
             }
           }
         ]
@@ -490,6 +497,22 @@ export default function AceitarSolicitacoesScreen() {
           </View>
         </View>
       </Modal>
+      
+      {/* Overlay de loading para atualização */}
+      {atualizandoLista && (
+        <Modal
+          visible={atualizandoLista}
+          transparent
+          animationType="fade"
+        >
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingContent}>
+              <ActivityIndicator size="large" color="#4CAF50" />
+              <Text style={styles.loadingOverlayText}>Atualizando informações...</Text>
+            </View>
+          </View>
+        </Modal>
+      )}
     </ScrollView>
   );
 }
@@ -850,5 +873,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Roboto-Medium',
     marginLeft: 8,
+  },
+  
+  // Overlay styles
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  loadingContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+  },
+  loadingOverlayText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontFamily: 'Roboto-Regular',
+    color: '#333333',
   },
 });

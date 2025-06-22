@@ -494,16 +494,16 @@ export default function DashboardPedidosScreen() {
                   )}
                   
                   {pedido.status_solicitacao === "coletado" && (
-                    <View style={styles.aguardandoContainer}>
+                    <View style={styles.aguardandoContainerCard}>
                       <Feather name="clock" size={14} color="#FFFFFF" />
-                      <Text style={styles.aguardandoText}>Aguardando cliente</Text>
+                      <Text style={styles.aguardandoTextCard}>Aguardando cliente</Text>
                     </View>
                   )}
 
                   {pedido.status_solicitacao === "finalizado" && (
-                    <View style={styles.finalizadoContainer}>
+                    <View style={styles.finalizadoContainerCard}>
                       <Feather name="check-circle" size={14} color="#FFFFFF" />
-                      <Text style={styles.finalizadoText}>Finalizado</Text>
+                      <Text style={styles.finalizadoTextCard}>Finalizado</Text>
                     </View>
                   )}
                 </View>
@@ -588,6 +588,95 @@ export default function DashboardPedidosScreen() {
                   </View>
                 </View>
                 
+                {/* Renderizar ações baseadas no status - Versão robusta */}
+                {(() => {
+                  // Normalizar o status para garantir comparação correta
+                  const statusNormalizado = String(selectedPedido.status_solicitacao || '').toLowerCase().trim();
+                  
+                  console.log('Status normalizado:', statusNormalizado);
+                  console.log('Status original:', selectedPedido.status_solicitacao);
+                  
+                  // Renderizar baseado no status
+                  if (statusNormalizado === 'aceitado' || statusNormalizado === 'aceito') {
+                    return (
+                      <View style={styles.acaoButtonContainer}>
+                        <TouchableOpacity
+                          style={styles.acaoButtonDestaque}
+                          onPress={handleMarcarColetado}
+                          disabled={atualizandoStatus}
+                        >
+                          {atualizandoStatus ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <>
+                              <Feather name="check-circle" size={20} color="#FFFFFF" />
+                              <Text style={styles.acaoButtonDestagueText}>Marcar como coletado</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                        <Text style={styles.acaoButtonHelper}>
+                          Clique aqui quando terminar a coleta
+                        </Text>
+                      </View>
+                    );
+                  }
+                  
+                  if (statusNormalizado === 'coletado') {
+                    return (
+                      <View style={styles.statusDestaque}>
+                        <View style={styles.aguardandoContainerDestaque}>
+                          <Feather name="clock" size={20} color="#FFFFFF" />
+                          <Text style={styles.aguardandoTextDestaque}>Aguardando cliente finalizar</Text>
+                        </View>
+                        <Text style={styles.statusHelperText}>
+                          O cliente precisa confirmar o recebimento
+                        </Text>
+                      </View>
+                    );
+                  }
+                  
+                  if (statusNormalizado === 'finalizado') {
+                    return (
+                      <View style={styles.statusDestaque}>
+                        <View style={styles.finalizadoContainerDestaque}>
+                          <Feather name="check-circle" size={20} color="#FFFFFF" />
+                          <Text style={styles.finalizadoTextDestaque}>Coleta finalizada!</Text>
+                        </View>
+                        <Text style={styles.statusHelperText}>
+                          Parabéns! Coleta concluída com sucesso
+                        </Text>
+                      </View>
+                    );
+                  }
+                  
+                  if (statusNormalizado === 'cancelado') {
+                    return (
+                      <View style={styles.statusDestaque}>
+                        <View style={styles.canceladoContainerDestaque}>
+                          <Feather name="x" size={20} color="#FFFFFF" />
+                          <Text style={styles.canceladoTextDestaque}>Coleta cancelada</Text>
+                        </View>
+                        <Text style={styles.statusHelperText}>
+                          Esta coleta foi cancelada
+                        </Text>
+                      </View>
+                    );
+                  }
+                  
+                  // Status desconhecido - mostrar informação genérica
+                  return (
+                    <View style={styles.statusDestaque}>
+                      <View style={styles.statusGenericoContainer}>
+                        <Feather name="info" size={20} color="#666666" />
+                        <Text style={styles.statusGenericoText}>Status: {selectedPedido.status_solicitacao}</Text>
+                      </View>
+                      <Text style={styles.statusHelperText}>
+                        Status não reconhecido pelo sistema
+                      </Text>
+                    </View>
+                  );
+                })()}
+                
                 <View style={styles.modalSection}>
                   <Text style={styles.modalSectionTitle}>Cliente</Text>
                   <View style={styles.clienteDetail}>
@@ -652,38 +741,6 @@ export default function DashboardPedidosScreen() {
                     R$ {formatarValor(selectedPedido.valor_pagamento)}
                   </Text>
                 </View>
-                
-                {/* Botões de ação baseados no status atual */}
-                {selectedPedido.status_solicitacao === "aceitado" && (
-                  <TouchableOpacity
-                    style={styles.acaoButton}
-                    onPress={handleMarcarColetado}
-                    disabled={atualizandoStatus}
-                  >
-                    {atualizandoStatus ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <Feather name="check-circle" size={18} color="#FFFFFF" />
-                        <Text style={styles.acaoButtonText}>Marcar como Coletado</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
-
-                {selectedPedido.status_solicitacao === "coletado" && (
-                  <View style={styles.aguardandoContainerModal}>
-                    <Feather name="clock" size={18} color="#FF9800" />
-                    <Text style={styles.aguardandoTextModal}>Aguardando cliente finalizar a coleta</Text>
-                  </View>
-                )}
-
-                {selectedPedido.status_solicitacao === "finalizado" && (
-                  <View style={styles.finalizadoContainerModal}>
-                    <Feather name="check-circle" size={18} color="#4CAF50" />
-                    <Text style={styles.finalizadoTextModal}>Coleta finalizada com sucesso!</Text>
-                  </View>
-                )}
               </ScrollView>
             )}
           </View>
@@ -1112,22 +1169,106 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Bold',
     color: '#4CAF50',
   },
-  acaoButton: {
-    backgroundColor: '#4CAF50',
-    flexDirection: 'row',
+  acaoButtonContainer: {
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    gap: 8,
+    borderRadius: 12,
+    marginBottom: 20,
+    backgroundColor: 'transparent',
   },
-  acaoButtonText: {
+  acaoButtonDestaque: {
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    minWidth: 250,
+  },
+  acaoButtonDestagueText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontFamily: 'Roboto-Medium',
+    fontFamily: 'Roboto-Bold',
+    marginLeft: 10,
+    textAlign: 'center',
   },
-  aguardandoContainer: {
+  acaoButtonHelper: {
+    color: '#4CAF50',
+    fontSize: 13,
+    fontFamily: 'Roboto-Medium',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  statusDestaque: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  aguardandoContainerDestaque: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    backgroundColor: '#FF9800',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    minWidth: 250,
+  },
+  aguardandoTextDestaque: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    marginLeft: 10,
+    textAlign: 'center',
+  },
+  statusHelperText: {
+    color: '#666666',
+    fontSize: 13,
+    fontFamily: 'Roboto-Medium',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  finalizadoContainerDestaque: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    backgroundColor: '#4CAF50',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    minWidth: 250,
+  },
+  finalizadoTextDestaque: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    marginLeft: 10,
+    textAlign: 'center',
+  },
+  
+  // Estilos para status nos cards da lista
+  aguardandoContainerCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FF9800',
@@ -1136,12 +1277,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 4,
   },
-  aguardandoText: {
+  aguardandoTextCard: {
     color: '#FFFFFF',
     fontSize: 12,
     fontFamily: 'Roboto-Medium',
   },
-  finalizadoContainer: {
+  finalizadoContainerCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#4CAF50',
@@ -1150,39 +1291,55 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 4,
   },
-  finalizadoText: {
+  finalizadoTextCard: {
     color: '#FFFFFF',
     fontSize: 12,
     fontFamily: 'Roboto-Medium',
   },
-  aguardandoContainerModal: {
+  
+  // Estilos para containers de status adicionais
+  canceladoContainerDestaque: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#FF9800',
-    marginTop: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    backgroundColor: '#F44336',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    minWidth: 250,
   },
-  aguardandoTextModal: {
+  canceladoTextDestaque: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'Roboto-Medium',
-    marginLeft: 8,
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    marginLeft: 10,
+    textAlign: 'center',
   },
-  finalizadoContainerModal: {
+  statusGenericoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#4CAF50',
-    marginTop: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    backgroundColor: '#9E9E9E',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    minWidth: 250,
   },
-  finalizadoTextModal: {
+  statusGenericoText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'Roboto-Medium',
-    marginLeft: 8,
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    marginLeft: 10,
+    textAlign: 'center',
   },
  });

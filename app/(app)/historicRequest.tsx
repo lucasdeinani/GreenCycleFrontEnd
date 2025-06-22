@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
-  RefreshControl
+  RefreshControl,
+  Linking
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -19,6 +20,11 @@ import { useCallback } from 'react';
 
 // URL base da API
 import { API_BASE_URL } from '../configs'
+
+// Declaração global para TypeScript
+declare global {
+  var refreshHistoric: (() => void) | undefined;
+}
 
 // Tipos para a nova estrutura da API
 interface ColetaCompleta {
@@ -268,6 +274,30 @@ export default function HistoricoColetasScreen() {
       return 'Data inválida';
     }
   };
+
+  // Iniciar conversa no WhatsApp com o parceiro
+  const iniciarConversaWhatsApp = (parceiroNome?: string) => {
+    // Simular telefone do parceiro (em produção viria da API)
+    const telefoneSimulado = "+5554" + Math.floor(Math.random() * 90000000 + 10000000);
+    
+    const mensagem = `Olá ${parceiroNome || 'parceiro'}! Sou o cliente da Green Cycle e gostaria de conversar sobre minha coleta.`;
+    const url = `whatsapp://send?phone=${telefoneSimulado}&text=${encodeURIComponent(mensagem)}`;
+    
+    Linking.canOpenURL(url)
+      .then((supported) => {
+        if (supported) {
+          return Linking.openURL(url);
+        } else {
+          // Tentar abrir no navegador como fallback
+          const webUrl = `https://wa.me/${telefoneSimulado.replace('+', '')}?text=${encodeURIComponent(mensagem)}`;
+          return Linking.openURL(webUrl);
+        }
+      })
+      .catch((err) => {
+        console.error('Erro ao abrir WhatsApp:', err);
+        Alert.alert('Erro', 'Não foi possível abrir o WhatsApp. Verifique se o aplicativo está instalado.');
+      });
+  };
   
   const renderStatusBadge = (status: string) => {
     // Normalizar o status para garantir correspondência
@@ -319,6 +349,24 @@ export default function HistoricoColetasScreen() {
       }
     }, [user?.user_id, userType])
   );
+
+  // Configurar refresh global para poder ser chamado de outras telas
+  useEffect(() => {
+    // Definir função global para refresh
+    global.refreshHistoric = () => {
+      console.log('Refresh forçado do histórico');
+      if (user?.user_id && userType) {
+        fetchColetas();
+      }
+    };
+
+    // Cleanup na desmontagem do componente
+    return () => {
+      if (global.refreshHistoric) {
+        delete global.refreshHistoric;
+      }
+    };
+  }, [user?.user_id, userType]);
 
   if (isLoading) {
     return (
@@ -420,6 +468,52 @@ export default function HistoricoColetasScreen() {
                     </Text>
                   </View>
                 </View>
+
+                {/* Botão de finalizar para coletas coletadas (apenas para clientes) */}
+                {userType === 'cliente' && coleta.status_solicitacao === "coletado" && 
+                 coleta.status_pagamento === "pendente" && (
+                  <View style={styles.acaoCardContainer}>
+                    <TouchableOpacity 
+                      style={styles.finalizarCardButton}
+                      onPress={(e) => {
+                        e.stopPropagation(); // Impedir que abra o modal
+                        Alert.alert(
+                          'Confirmar Finalização',
+                          'Confirma que recebeu a coleta e deseja finalizar o pagamento?',
+                          [
+                            { text: 'Cancelar', style: 'cancel' },
+                            { 
+                              text: 'Confirmar', 
+                              onPress: async () => {
+                                setActionLoading(true);
+                                try {
+                                  await axios.post(`${API_BASE_URL}/coletas/${coleta.id}/finalizar-coleta/`);
+                                  await fetchColetas();
+                                  Alert.alert('Sucesso', 'Coleta finalizada com sucesso! O pagamento foi processado.');
+                                } catch (error: any) {
+                                  console.error('Erro ao finalizar coleta:', error);
+                                  Alert.alert('Erro', 'Não foi possível finalizar a coleta. Tente novamente.');
+                                } finally {
+                                  setActionLoading(false);
+                                }
+                              }
+                            }
+                          ]
+                        );
+                      }}
+                      disabled={actionLoading}
+                    >
+                      {actionLoading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Feather name="check-circle" size={16} color="#FFFFFF" />
+                          <Text style={styles.finalizarCardButtonText}>Confirmar pagamento e finalizar</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
               </TouchableOpacity>
             ))}
             
@@ -518,12 +612,24 @@ export default function HistoricoColetasScreen() {
                   </Text>
                 </View>
 
-                {selectedColeta.parceiro_nome && (
+                {selectedColeta.parceiro_nome && userType === 'cliente' && (
                   <View style={styles.modalSection}>
                     <Text style={styles.modalSectionTitle}>Parceiro</Text>
-                    <Text style={styles.parceiroText}>
-                      {selectedColeta.parceiro_nome}
-                    </Text>
+                    <View style={styles.parceiroDetail}>
+                      <Feather name="user" size={24} color="#4CAF50" style={styles.parceiroIcon} />
+                      <View>
+                        <Text style={styles.parceiroNome}>{selectedColeta.parceiro_nome}</Text>
+                        <Text style={styles.parceiroDescricao}>Parceiro responsável pela coleta</Text>
+                      </View>
+                    </View>
+                    
+                    <TouchableOpacity
+                      style={styles.whatsappButton}
+                      onPress={() => iniciarConversaWhatsApp(selectedColeta.parceiro_nome || undefined)}
+                    >
+                      <FontAwesome5 name="whatsapp" size={20} color="#FFFFFF" />
+                      <Text style={styles.whatsappButtonText}>Contatar pelo WhatsApp</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
                 
@@ -555,50 +661,143 @@ export default function HistoricoColetasScreen() {
                   </View>
                 </View>
                 
-                {/* Botões de ação baseados no status e tipo de usuário */}
-                {userType === 'cliente' && selectedColeta.status_solicitacao === "pendente" && 
-                 selectedColeta.status_pagamento === "pendente" && (
-                  <TouchableOpacity 
-                    style={styles.cancelButton}
-                    onPress={handleCancelarColeta}
-                    disabled={actionLoading}
-                  >
-                    {actionLoading ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.cancelButtonText}>Cancelar Coleta</Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-
-                {userType === 'cliente' && selectedColeta.status_solicitacao === "coletado" && 
-                 selectedColeta.status_pagamento === "pendente" && (
-                  <TouchableOpacity 
-                    style={styles.finalizeButton}
-                    onPress={handleFinalizarColeta}
-                    disabled={actionLoading}
-                  >
-                    {actionLoading ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.finalizeButtonText}>Finalizar Coleta</Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-
-                {/* Informações para parceiros */}
-                {userType === 'parceiro' && (
-                  <View style={styles.parceiroInfo}>
-                    <Text style={styles.parceiroInfoText}>
-                      Status: {STATUS_MAP[selectedColeta.status_solicitacao as keyof typeof STATUS_MAP]?.label || selectedColeta.status_solicitacao}
-                    </Text>
-                    {selectedColeta.status_solicitacao === "coletado" && (
-                      <Text style={styles.parceiroInfoText}>
-                        Aguardando cliente finalizar a coleta
+                {/* Renderizar ações baseadas no status - Versão robusta */}
+                {(() => {
+                  // Normalizar o status para garantir comparação correta
+                  const statusNormalizado = String(selectedColeta.status_solicitacao || '').toLowerCase().trim();
+                  const statusPagamento = String(selectedColeta.status_pagamento || '').toLowerCase().trim();
+                  
+                  console.log('Status normalizado:', statusNormalizado);
+                  console.log('Status pagamento:', statusPagamento);
+                  console.log('Tipo de usuário:', userType);
+                  
+                  // Renderizar baseado no status para clientes
+                  if (userType === 'cliente') {
+                    // Botão de cancelar para coletas pendentes
+                    if (statusNormalizado === 'pendente' && statusPagamento === 'pendente') {
+                      return (
+                        <View style={styles.acaoModalContainer}>
+                          <TouchableOpacity 
+                            style={styles.cancelarModalButton}
+                            onPress={handleCancelarColeta}
+                            disabled={actionLoading}
+                          >
+                            {actionLoading ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <>
+                                <Feather name="x-circle" size={18} color="#FFFFFF" />
+                                <Text style={styles.cancelarModalButtonText}>Cancelar Coleta</Text>
+                              </>
+                            )}
+                          </TouchableOpacity>
+                          <Text style={styles.acaoModalHelper}>
+                            Você pode cancelar esta coleta enquanto ela estiver pendente
+                          </Text>
+                        </View>
+                      );
+                    }
+                    
+                    // Botão de finalizar para coletas coletadas
+                    if (statusNormalizado === 'coletado' && statusPagamento === 'pendente') {
+                      return (
+                        <View style={styles.acaoModalContainer}>
+                          <TouchableOpacity 
+                            style={styles.finalizarModalButton}
+                            onPress={handleFinalizarColeta}
+                            disabled={actionLoading}
+                          >
+                            {actionLoading ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <>
+                                <Feather name="check-circle" size={18} color="#FFFFFF" />
+                                <Text style={styles.finalizarModalButtonText}>Confirmar pagamento e finalizar</Text>
+                              </>
+                            )}
+                          </TouchableOpacity>
+                          <Text style={styles.acaoModalHelper}>
+                            Confirme que recebeu a coleta para finalizar o pagamento
+                          </Text>
+                        </View>
+                      );
+                    }
+                    
+                    // Status finalizado
+                    if (statusNormalizado === 'finalizado') {
+                      return (
+                        <View style={styles.statusModalDestaque}>
+                          <View style={styles.finalizadoModalContainer}>
+                            <Feather name="check-circle" size={20} color="#FFFFFF" />
+                            <Text style={styles.finalizadoModalText}>Coleta finalizada!</Text>
+                          </View>
+                          <Text style={styles.statusModalHelper}>
+                            Parabéns! Sua coleta foi concluída com sucesso
+                          </Text>
+                        </View>
+                      );
+                    }
+                    
+                    // Status cancelado
+                    if (statusNormalizado === 'cancelado') {
+                      return (
+                        <View style={styles.statusModalDestaque}>
+                          <View style={styles.canceladoModalContainer}>
+                            <Feather name="x" size={20} color="#FFFFFF" />
+                            <Text style={styles.canceladoModalText}>Coleta cancelada</Text>
+                          </View>
+                          <Text style={styles.statusModalHelper}>
+                            Esta coleta foi cancelada
+                          </Text>
+                        </View>
+                      );
+                    }
+                    
+                    // Status aceito (aguardando coleta)
+                    if (statusNormalizado === 'aceitado' || statusNormalizado === 'aceito') {
+                      return (
+                        <View style={styles.statusModalDestaque}>
+                          <View style={styles.aceitoModalContainer}>
+                            <Feather name="clock" size={20} color="#FFFFFF" />
+                            <Text style={styles.aceitoModalText}>Aguardando coleta</Text>
+                          </View>
+                          <Text style={styles.statusModalHelper}>
+                            O parceiro irá realizar a coleta em breve
+                          </Text>
+                        </View>
+                      );
+                    }
+                  }
+                  
+                  // Informações para parceiros
+                  if (userType === 'parceiro') {
+                    return (
+                      <View style={styles.parceiroModalInfo}>
+                        <Text style={styles.parceiroModalInfoText}>
+                          Status: {STATUS_MAP[selectedColeta.status_solicitacao as keyof typeof STATUS_MAP]?.label || selectedColeta.status_solicitacao}
+                        </Text>
+                        {statusNormalizado === "coletado" && (
+                          <Text style={styles.parceiroModalInfoText}>
+                            Aguardando cliente finalizar a coleta
+                          </Text>
+                        )}
+                      </View>
+                    );
+                  }
+                  
+                  // Status desconhecido
+                  return (
+                    <View style={styles.statusModalDestaque}>
+                      <View style={styles.statusGenericoModalContainer}>
+                        <Feather name="info" size={20} color="#FFFFFF" />
+                        <Text style={styles.statusGenericoModalText}>Status: {selectedColeta.status_solicitacao}</Text>
+                      </View>
+                      <Text style={styles.statusModalHelper}>
+                        Status não reconhecido pelo sistema
                       </Text>
-                    )}
-                  </View>
-                )}
+                    </View>
+                  );
+                })()}
               </ScrollView>
             )}
           </View>
@@ -858,32 +1057,7 @@ const styles = StyleSheet.create({
     color: '#333333',
     lineHeight: 22,
   },
-  cancelButton: {
-    backgroundColor: '#F44336',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  cancelButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Roboto-Medium',
-  },
-  finalizeButton: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  finalizeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Roboto-Medium',
-  },
+
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -894,13 +1068,175 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Medium',
     color: '#666666',
   },
-  parceiroText: {
-    fontSize: 14,
-    fontFamily: 'Roboto-Regular',
-    color: '#333333',
-    lineHeight: 22,
+
+
+  acaoCardContainer: {
+    padding: 12,
+    marginTop: 8,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
   },
-  parceiroInfo: {
+  finalizarCardButton: {
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    gap: 8,
+  },
+  finalizarCardButtonText: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Medium',
+    color: '#FFFFFF',
+  },
+  acaoModalContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    backgroundColor: 'transparent',
+  },
+  cancelarModalButton: {
+    backgroundColor: '#F44336',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    minWidth: 250,
+    marginBottom: 8,
+  },
+  cancelarModalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    marginLeft: 8,
+    textAlign: 'center',
+  },
+  acaoModalHelper: {
+    color: '#F44336',
+    fontSize: 13,
+    fontFamily: 'Roboto-Medium',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  finalizarModalButton: {
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    minWidth: 250,
+    marginBottom: 8,
+  },
+  finalizarModalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    marginLeft: 8,
+    textAlign: 'center',
+  },
+  statusModalDestaque: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  finalizadoModalContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    backgroundColor: '#4CAF50',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    minWidth: 250,
+  },
+  finalizadoModalText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    marginLeft: 10,
+    textAlign: 'center',
+  },
+  statusModalHelper: {
+    color: '#666666',
+    fontSize: 13,
+    fontFamily: 'Roboto-Medium',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  canceladoModalContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    backgroundColor: '#F44336',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    minWidth: 250,
+  },
+  canceladoModalText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    marginLeft: 10,
+    textAlign: 'center',
+  },
+  aceitoModalContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    backgroundColor: '#2196F3',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    minWidth: 250,
+  },
+  aceitoModalText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    marginLeft: 10,
+    textAlign: 'center',
+  },
+  parceiroModalInfo: {
     marginTop: 16,
     padding: 16,
     backgroundColor: '#FFFFFF',
@@ -911,10 +1247,65 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  parceiroInfoText: {
+  parceiroModalInfoText: {
     fontSize: 14,
     fontFamily: 'Roboto-Regular',
     color: '#333333',
     lineHeight: 22,
+  },
+  statusGenericoModalContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    backgroundColor: '#9E9E9E',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    minWidth: 250,
+  },
+  statusGenericoModalText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    marginLeft: 10,
+    textAlign: 'center',
+  },
+  parceiroDetail: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  parceiroIcon: {
+    marginRight: 16,
+  },
+  parceiroNome: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Medium',
+    color: '#333333',
+  },
+  parceiroDescricao: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#666666',
+    marginTop: 2,
+  },
+  whatsappButton: {
+    backgroundColor: '#25D366',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  whatsappButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Roboto-Medium',
   },
 });

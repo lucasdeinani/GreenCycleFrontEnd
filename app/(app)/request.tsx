@@ -17,6 +17,11 @@ import { useUser } from '../context/UserContext';
 import { API_BASE_URL } from '../configs'; 
 import axios from 'axios';
 
+// Declaração global para TypeScript
+declare global {
+  var refreshHistoric: (() => void) | undefined;
+}
+
 interface Material {
   id: number;
   nome: string;
@@ -251,9 +256,17 @@ export default function SolicitarColetaScreen() {
         [{ 
           text: 'OK', 
           onPress: () => {
-            // Verificar se veio do histórico e recarregar
+            // Verificar se veio do histórico e recarregar forçando refresh
             if (router.canGoBack()) {
+              // Navegar de volta e forçar refresh da tela anterior
               router.back();
+              // Pequeno delay para garantir que a tela anterior já carregou
+              setTimeout(() => {
+                // Dispatch um evento customizado para forçar refresh
+                if (global.refreshHistoric) {
+                  global.refreshHistoric();
+                }
+              }, 100);
             } else {
               router.push('/(app)/home' as any);
             }

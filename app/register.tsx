@@ -17,6 +17,7 @@ import { Feather } from '@expo/vector-icons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from './context/UserContext';
 import { REGISTER_MATERIALS, API_BASE_URL } from './configs';
+import { formatPhone, cleanPhone, getPhoneError } from './utils/phoneUtils';
 
 export default function RegisterScreen() {
     const [userType, setUserType] = useState<'client' | 'partner'>('client');
@@ -24,6 +25,7 @@ export default function RegisterScreen() {
         fullName: '',
         email: '',
         document: '', // CPF or CNPJ
+        phone: '',
         gender: '',
         birthday: new Date(),
         username: '',
@@ -45,6 +47,31 @@ export default function RegisterScreen() {
         if (errors[field]) {
             setErrors(prev => ({ ...prev, [field]: null }));
         }
+    };
+
+    const handlePhoneChange = (value: string) => {
+        // Remove caracteres não numéricos e limita a 11 dígitos
+        const cleaned = value.replace(/\D/g, '').slice(0, 11);
+        
+        let formattedPhone = '';
+        
+        if (cleaned.length === 0) {
+            formattedPhone = '';
+        } else if (cleaned.length === 1) {
+            formattedPhone = `(${cleaned}`;
+        } else if (cleaned.length === 2) {
+            formattedPhone = `(${cleaned})`;
+        } else if (cleaned.length <= 6) {
+            formattedPhone = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
+        } else if (cleaned.length <= 10) {
+            // Telefone fixo: (XX) XXXX-XXXX
+            formattedPhone = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
+        } else if (cleaned.length === 11) {
+            // Celular: (XX) XXXXX-XXXX
+            formattedPhone = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+        }
+        
+        handleChange('phone', formattedPhone);
     };
 
     const handleMaterialToggle = (material: string) => {
@@ -82,6 +109,14 @@ export default function RegisterScreen() {
                 newErrors.document = 'CPF inválido';
             } else if (userType === 'partner' && cleanDoc.length !== 14) {
                 newErrors.document = 'CNPJ inválido';
+            }
+        }
+
+        // Validação de telefone
+        if (formData.phone.trim()) {
+            const phoneError = getPhoneError(formData.phone);
+            if (phoneError) {
+                newErrors.phone = phoneError;
             }
         }
 
@@ -159,6 +194,11 @@ export default function RegisterScreen() {
                   senha: formData.password,
                   id_endereco: null
                 };
+
+                // Adiciona telefone se fornecido
+                if (formData.phone.trim()) {
+                  payload.telefone = cleanPhone(formData.phone);
+                }
               } else {
                 payload = {
                   usuario: formData.username.trim(),
@@ -172,6 +212,11 @@ export default function RegisterScreen() {
                     return material ? material.id : 0;
                   }).filter(id => id !== 0)
                 };
+
+                // Adiciona telefone se fornecido
+                if (formData.phone.trim()) {
+                  payload.telefone = cleanPhone(formData.phone);
+                }
               }
         
               console.log('Payload sendo enviado:', payload); // Para debug
@@ -200,14 +245,13 @@ export default function RegisterScreen() {
         }
     };
 
-
-
     const handleUserTypeChange = (type: 'client' | 'partner') => {
         // Limpa todos os campos do formulário
         setFormData({
             fullName: '',
             email: '',
             document: '',
+            phone: '',
             gender: '',
             birthday: new Date(),
             username: '',
@@ -304,6 +348,22 @@ export default function RegisterScreen() {
                         editable={!isLoading}
                     />
                     {errors.document && <Text style={styles.errorText}>{errors.document}</Text>}
+                </View>
+
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Telefone (opcional)</Text>
+                    <TextInput
+                        style={[styles.input, errors.phone && styles.inputError]}
+                        placeholder="(XX) XXXXX-XXXX"
+                        keyboardType="phone-pad"
+                        value={formData.phone}
+                        onChangeText={handlePhoneChange}
+                        maxLength={15}
+                        editable={!isLoading}
+                        autoCorrect={false}
+                        autoCapitalize="none"
+                    />
+                    {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
                 </View>
 
                 {userType === 'client' && (
@@ -516,82 +576,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#E0E0E0',
         borderRadius: 8,
         marginBottom: 24,
-    },
-    toggleButton: {
-        flex: 1,
-        paddingVertical: 12,
-        alignItems: 'center',
-        borderRadius: 8,
-    },
-    toggleButtonActive: {
-        backgroundColor: '#FFC107',
-    },
-    toggleText: {
-        fontFamily: 'Roboto-Medium',
-        fontSize: 16,
-        color: '#666',
-    },
-    toggleTextActive: {
-        color: '#333333',
-    },
-    form: {
-        marginBottom: 16,
-    },
-    inputGroup: {
-        marginBottom: 16,
-    },
-    label: {
-        fontFamily: 'Roboto-Medium',
-        fontSize: 16,
-        color: '#333333',
-        marginBottom: 8,
-    },
-    input: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 8,
-        padding: 12,
-        fontSize: 16,
-        fontFamily: 'Roboto-Regular',
-        color: '#333333',
-    },
-    inputError: {
-        borderColor: '#FF5252',
-        borderWidth: 1,
-    },
-    genderContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    genderButton: {
-        flex: 1,
-        padding: 12,
-        marginHorizontal: 4,
-        backgroundColor: '#E0E0E0',
-        borderRadius: 8,
-        alignItems: 'center',
-    },
-    genderButtonActive: {
-        backgroundColor: '#4CAF50',
-    },
-    genderButtonText: {
-        color: '#333333',
-        fontFamily: 'Roboto-Regular',
-    },
-    genderButtonTextActive: {
-        color: '#FFFFFF',
-        fontFamily: 'Roboto-Medium',
-    },
-    materialContainer: {
-        flexDirection: 'column',
-        gap: 8,
-    },
-    materialButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 12,
-        backgroundColor: '#E0E0E0',
-        borderRadius: 8,
-        margin: 16,
     },
     toggleButton: {
         flex: 1,

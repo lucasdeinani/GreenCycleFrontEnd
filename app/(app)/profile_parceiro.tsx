@@ -8,12 +8,13 @@ import { Feather } from '@expo/vector-icons';
 import { useUser } from '../context/UserContext';
 import { PasswordResetModal } from './password_reset_modal';
 import { useProfileImage } from '../../hooks/useProfileImage';
+import { formatPhone, cleanPhone, getPhoneError } from '../utils/phoneUtils';
 import { REGISTER_MATERIALS } from '../configs';
 import axios from 'axios';
 import { API_BASE_URL } from '../configs';
 
 export default function ProfileParceiroScreen() {
-  const { user, setUser } = useUser();
+  const { user, setUser, updateUserPhone } = useUser();
   const { imageUri, isLoading: imageLoading, isUpdating: imageUpdating, updateImage } = useProfileImage();
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -24,6 +25,7 @@ export default function ProfileParceiroScreen() {
     fullName: '',
     email: '',
     document: '',
+    phone: '',
     username: '',
     collectionMaterials: [] as string[],
   });
@@ -34,6 +36,7 @@ export default function ProfileParceiroScreen() {
         fullName: user.nome || '',
         email: user.email || '',
         document: user.cnpj || '',
+        phone: user.telefone || '',
         username: user.usuario || '',
         collectionMaterials: user.materiais?.map(m => m.nome) || [],
       });
@@ -45,6 +48,31 @@ export default function ProfileParceiroScreen() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
+  };
+
+  const handlePhoneChange = (value: string) => {
+    // Remove caracteres não numéricos e limita a 11 dígitos
+    const cleaned = value.replace(/\D/g, '').slice(0, 11);
+    
+    let formattedPhone = '';
+    
+    if (cleaned.length === 0) {
+        formattedPhone = '';
+    } else if (cleaned.length === 1) {
+        formattedPhone = `(${cleaned}`;
+    } else if (cleaned.length === 2) {
+        formattedPhone = `(${cleaned})`;
+    } else if (cleaned.length <= 6) {
+        formattedPhone = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
+    } else if (cleaned.length <= 10) {
+        // Telefone fixo: (XX) XXXX-XXXX
+        formattedPhone = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
+    } else if (cleaned.length === 11) {
+        // Celular: (XX) XXXXX-XXXX
+        formattedPhone = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+    }
+    
+    handleChange('phone', formattedPhone);
   };
 
   const validateForm = () => {
@@ -62,6 +90,14 @@ export default function ProfileParceiroScreen() {
 
     if (!formData.username.trim()) {
       newErrors.username = 'Usuário é obrigatório';
+    }
+
+    // Validação de telefone (opcional)
+    if (formData.phone.trim()) {
+      const phoneError = getPhoneError(formData.phone);
+      if (phoneError) {
+        newErrors.phone = phoneError;
+      }
     }
 
     setErrors(newErrors);
@@ -101,12 +137,21 @@ export default function ProfileParceiroScreen() {
         payload
       );
 
+      // Atualizar telefone separadamente se foi alterado
+      if (formData.phone.trim() !== (user.telefone || '')) {
+        const phoneSuccess = await updateUserPhone(formData.phone);
+        if (!phoneSuccess && formData.phone.trim()) {
+          Alert.alert('Aviso', 'Perfil atualizado, mas houve um problema ao salvar o telefone.');
+        }
+      }
+
       // Atualizar contexto com os novos dados
       const updatedUser = {
         ...user,
         nome: formData.fullName,
         email: formData.email,
         usuario: formData.username,
+        telefone: formData.phone || user.telefone,
         materiais: formData.collectionMaterials.map(materialName => {
           const material = REGISTER_MATERIALS.find(m => m.nome === materialName);
           return {
@@ -136,6 +181,7 @@ export default function ProfileParceiroScreen() {
         fullName: user.nome || '',
         email: user.email || '',
         document: user.cnpj || '',
+        phone: user.telefone || '',
         username: user.usuario || '',
         collectionMaterials: user.materiais?.map(m => m.nome) || [],
       });
@@ -262,6 +308,24 @@ export default function ProfileParceiroScreen() {
               placeholder="CNPJ da empresa"
             />
             <Feather name="lock" size={18} color="#999" style={styles.inputIcon} />
+        </View>
+
+        {/* Telefone */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Telefone</Text>
+            <TextInput
+              style={[styles.input, !isEditing && styles.disabledInput]}
+              value={formData.phone}
+              onChangeText={handlePhoneChange}
+              keyboardType="phone-pad"
+              editable={isEditing}
+              placeholder="(XX) XXXXX-XXXX"
+              maxLength={15}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {isEditing && <Feather name="edit" size={18} color="#666" style={styles.inputIcon} />}
+          {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
         </View>
 
         {/* Usuário */}

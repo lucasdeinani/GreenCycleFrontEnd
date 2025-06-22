@@ -32,6 +32,9 @@ type User = {
     preco?: string;
   }>;
   
+  // Telefone
+  telefone?: string;        // Número de telefone formatado
+  
   // Imagem de perfil
   profileImageUri?: string;   // URI da imagem de perfil atual
   
@@ -58,6 +61,8 @@ type UserContextType = {
   updatePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
   updateProfileImage: (imageUri: string) => void;
   clearProfileImage: () => void;
+  fetchUserPhone: () => Promise<string | null>;
+  updateUserPhone: (phone: string) => Promise<boolean>;
   isAuthenticated: boolean;
 };
 
@@ -72,7 +77,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     const loadUser = async () => {
       const storedUser = await AsyncStorage.getItem('user');
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
         setIsAuthenticated(true);
         
         // Inicializar cache de imagens quando carregar usuário
@@ -81,10 +87,76 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         } catch (error) {
           console.error('Erro ao inicializar cache de imagens:', error);
         }
+
+        // Buscar telefone do usuário após carregar
+        try {
+          const phone = await fetchUserPhoneFromAPI(userData.user_id);
+          if (phone && phone !== userData.telefone) {
+            const updatedUser = { ...userData, telefone: phone };
+            setUser(updatedUser);
+            await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+          }
+        } catch (error) {
+          console.log('Usuário ainda não possui telefone cadastrado');
+        }
       }
     };
     loadUser();
   }, []);
+
+  const fetchUserPhoneFromAPI = async (userId: number): Promise<string | null> => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/telefones/${userId}/`);
+      return response.data.numero;
+    } catch (error) {
+      console.log('Telefone não encontrado para o usuário');
+      return null;
+    }
+  };
+
+  const fetchUserPhone = async (): Promise<string | null> => {
+    if (!user) return null;
+    return await fetchUserPhoneFromAPI(user.user_id);
+  };
+
+  const updateUserPhone = async (phone: string): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      // Remove formatação do telefone para enviar à API
+      const cleanPhone = phone.replace(/\D/g, '');
+      
+      // Primeiro, tenta atualizar o telefone
+      try {
+        await axios.put(`${API_BASE_URL}/telefones/${user.user_id}/`, {
+          numero: cleanPhone
+        });
+      } catch (error: any) {
+        // Se falhar (404), tenta criar um novo telefone
+        if (error.response?.status === 404) {
+          await axios.post(`${API_BASE_URL}/telefones/`, {
+            id_usuarios: user.user_id,
+            numero: cleanPhone
+          });
+        } else {
+          throw error;
+        }
+      }
+
+      // Busca o telefone atualizado/criado para obter o formato correto
+      const updatedPhone = await fetchUserPhoneFromAPI(user.user_id);
+      if (updatedPhone) {
+        const updatedUser = { ...user, telefone: updatedPhone };
+        setUser(updatedUser);
+        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar telefone:', error);
+      return false;
+    }
+  };
 
   const login = async (apiResponse: any, type: 'client' | 'partner') => {
     // ===== LOGS DE DEBUG ADICIONADOS =====
@@ -138,6 +210,18 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Erro ao inicializar cache de imagens:', error);
     }
+
+    // Buscar telefone do usuário após login
+    try {
+      const phone = await fetchUserPhoneFromAPI(userToStore.user_id);
+      if (phone) {
+        const updatedUser = { ...userToStore, telefone: phone };
+        setUser(updatedUser);
+        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+    } catch (error) {
+      console.log('Usuário ainda não possui telefone cadastrado');
+    }
   };
 
   const logout = async () => {
@@ -187,7 +271,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <UserContext.Provider value={
-      { user, setUser, login, logout, updatePassword, updateProfileImage, clearProfileImage, isAuthenticated }
+      { user, setUser, login, logout, updatePassword, updateProfileImage, clearProfileImage, fetchUserPhone, updateUserPhone, isAuthenticated }
       }>
       {children}
     </UserContext.Provider>

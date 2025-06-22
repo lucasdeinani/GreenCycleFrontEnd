@@ -9,11 +9,12 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useUser } from '../context/UserContext';
 import { PasswordResetModal } from './password_reset_modal';
 import { useProfileImage } from '../../hooks/useProfileImage';
+import { formatPhone, cleanPhone, getPhoneError } from '../utils/phoneUtils';
 import axios from 'axios';
 import { API_BASE_URL } from '../configs';
 
 export default function ProfileScreen() {
-  const { user, setUser } = useUser();
+  const { user, setUser, updateUserPhone } = useUser();
   const { imageUri, isLoading: imageLoading, isUpdating: imageUpdating, updateImage } = useProfileImage();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [resetModalVisible, setResetModalVisible] = useState(false);
@@ -34,6 +35,7 @@ export default function ProfileScreen() {
     fullName: user?.nome || '',
     email: user?.email || '',
     document: user?.cpf || '',
+    phone: user?.telefone || '',
     gender: getFullGenderName(user?.sexo),
     birthday: user?.data_nascimento ? new Date(user.data_nascimento) : new Date('1990-01-01'),
     username: user?.usuario || '',
@@ -44,6 +46,31 @@ export default function ProfileScreen() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
+  };
+
+  const handlePhoneChange = (value: string) => {
+    // Remove caracteres não numéricos e limita a 11 dígitos
+    const cleaned = value.replace(/\D/g, '').slice(0, 11);
+    
+    let formattedPhone = '';
+    
+    if (cleaned.length === 0) {
+        formattedPhone = '';
+    } else if (cleaned.length === 1) {
+        formattedPhone = `(${cleaned}`;
+    } else if (cleaned.length === 2) {
+        formattedPhone = `(${cleaned})`;
+    } else if (cleaned.length <= 6) {
+        formattedPhone = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
+    } else if (cleaned.length <= 10) {
+        // Telefone fixo: (XX) XXXX-XXXX
+        formattedPhone = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
+    } else if (cleaned.length === 11) {
+        // Celular: (XX) XXXXX-XXXX
+        formattedPhone = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+    }
+    
+    handleChange('phone', formattedPhone);
   };
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
@@ -70,6 +97,14 @@ export default function ProfileScreen() {
       newErrors.username = 'Usuário é obrigatório';
     }
 
+    // Validação de telefone (opcional)
+    if (formData.phone.trim()) {
+      const phoneError = getPhoneError(formData.phone);
+      if (phoneError) {
+        newErrors.phone = phoneError;
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -94,6 +129,14 @@ export default function ProfileScreen() {
         payload
       );
 
+      // Atualizar telefone separadamente se foi alterado
+      if (formData.phone.trim() !== (user.telefone || '')) {
+        const phoneSuccess = await updateUserPhone(formData.phone);
+        if (!phoneSuccess && formData.phone.trim()) {
+          Alert.alert('Aviso', 'Perfil atualizado, mas houve um problema ao salvar o telefone.');
+        }
+      }
+
       // Atualizar contexto com os novos dados
       const updatedUser = {
         ...user,
@@ -101,7 +144,8 @@ export default function ProfileScreen() {
         email: formData.email,
         usuario: formData.username,
         sexo: formData.gender[0].toUpperCase(),
-        data_nascimento: formData.birthday.toISOString().split('T')[0]
+        data_nascimento: formData.birthday.toISOString().split('T')[0],
+        telefone: formData.phone || user.telefone
       };
 
       setUser(updatedUser);
@@ -121,6 +165,7 @@ export default function ProfileScreen() {
       fullName: user?.nome || '',
       email: user?.email || '',
       document: user?.cpf || '',
+      phone: user?.telefone || '',
       gender: getFullGenderName(user?.sexo),
       birthday: user?.data_nascimento ? new Date(user.data_nascimento) : new Date('1990-01-01'),
       username: user?.usuario || '',
@@ -243,6 +288,24 @@ export default function ProfileScreen() {
               placeholder="Seu CPF"
             />
             <Feather name="lock" size={18} color="#999" style={styles.inputIcon} />
+        </View>
+
+        {/* Telefone */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Telefone</Text>
+            <TextInput
+              style={[styles.input, !isEditing && styles.disabledInput]}
+              value={formData.phone}
+              onChangeText={handlePhoneChange}
+              keyboardType="phone-pad"
+              editable={isEditing}
+              placeholder="(XX) XXXXX-XXXX"
+              maxLength={15}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {isEditing && <Feather name="edit" size={18} color="#666" style={styles.inputIcon} />}
+          {errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
         </View>
 
         {/* Sexo */}

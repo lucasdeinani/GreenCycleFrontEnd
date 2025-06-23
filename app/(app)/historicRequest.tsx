@@ -184,17 +184,25 @@ export default function HistoricoColetasScreen() {
     setModalVisible(true);
     setColetaDetalhes(null);
     
-    // Buscar detalhes completos da coleta
-    setBuscandoDetalhes(true);
-    try {
-      console.log(`Buscando detalhes da coleta ${coleta.id}`);
-      const detalhes = await fetchColetaDetalhes(coleta.id);
-      setColetaDetalhes(detalhes);
-    } catch (error) {
-      console.error('Erro ao buscar detalhes da coleta:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os detalhes da coleta.');
-    } finally {
-      setBuscandoDetalhes(false);
+    // Verificar se precisa buscar detalhes (apenas para status que mostram contato)
+    const statusNormalizado = coleta.status_solicitacao.toLowerCase();
+    const precisaBuscarDetalhes = userType === 'cliente' 
+      ? ['aceitado', 'aceito', 'coletado', 'finalizado'].includes(statusNormalizado)
+      : true; // Parceiros sempre podem ver detalhes do cliente
+    
+    if (precisaBuscarDetalhes) {
+      // Buscar detalhes completos da coleta
+      setBuscandoDetalhes(true);
+      try {
+        console.log(`Buscando detalhes da coleta ${coleta.id}`);
+        const detalhes = await fetchColetaDetalhes(coleta.id);
+        setColetaDetalhes(detalhes);
+      } catch (error) {
+        console.error('Erro ao buscar detalhes da coleta:', error);
+        Alert.alert('Erro', 'Não foi possível carregar os detalhes da coleta.');
+      } finally {
+        setBuscandoDetalhes(false);
+      }
     }
   };
 
@@ -202,7 +210,7 @@ export default function HistoricoColetasScreen() {
     if (!selectedColeta) return;
     
     // Verificar se a coleta pode ser cancelada (pendente)
-    if (selectedColeta.status_solicitacao !== "pendente") {
+    if (selectedColeta.status_solicitacao !== "Pendente") {
       Alert.alert(
         'Não é possível cancelar', 
         'Apenas coletas pendentes podem ser canceladas.'
@@ -210,7 +218,7 @@ export default function HistoricoColetasScreen() {
       return;
     }
     
-    if (selectedColeta.status_pagamento !== "pendente") {
+    if (selectedColeta.status_pagamento !== "Pendente") {
       Alert.alert(
         'Não é possível cancelar', 
         'Apenas coletas com pagamento pendente podem ser canceladas.'
@@ -675,7 +683,7 @@ export default function HistoricoColetasScreen() {
                   </Text>
                 </View>
 
-                {userType === 'cliente' && (selectedColeta?.parceiro_nome || buscandoDetalhes) && (
+                {userType === 'cliente' && selectedColeta && ['aceitado', 'aceito', 'coletado', 'finalizado'].includes(selectedColeta.status_solicitacao.toLowerCase()) && (selectedColeta?.parceiro_nome || buscandoDetalhes) && (
                   <View style={styles.modalSection}>
                     <Text style={styles.modalSectionTitle}>Parceiro</Text>
                     {buscandoDetalhes ? (
@@ -707,6 +715,21 @@ export default function HistoricoColetasScreen() {
                     ) : (
                       <Text style={styles.erroDetalhes}>Não foi possível carregar as informações do parceiro.</Text>
                     )}
+                  </View>
+                )}
+
+                {userType === 'cliente' && selectedColeta && selectedColeta.status_solicitacao.toLowerCase() === 'pendente' && (
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>Status da Coleta</Text>
+                    <View style={styles.statusInfoContainer}>
+                      <Feather name="clock" size={24} color="#FFC107" />
+                      <View style={styles.statusInfoText}>
+                        <Text style={styles.statusInfoTitle}>Aguardando Parceiro</Text>
+                        <Text style={styles.statusInfoDescription}>
+                          Sua solicitação está pendente. Assim que um parceiro aceitar a coleta, você poderá visualizar as informações de contato.
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 )}
 
@@ -1446,5 +1469,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Roboto-Regular',
     textAlign: 'center',
+  },
+  statusInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 16,
+    backgroundColor: '#FFF8E1',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFC107',
+  },
+  statusInfoText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  statusInfoTitle: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Medium',
+    color: '#333333',
+    marginBottom: 4,
+  },
+  statusInfoDescription: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#666666',
+    lineHeight: 20,
   },
 });

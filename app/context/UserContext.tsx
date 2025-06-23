@@ -63,6 +63,8 @@ type UserContextType = {
   clearProfileImage: () => void;
   fetchUserPhone: () => Promise<string | null>;
   updateUserPhone: (phone: string) => Promise<boolean>;
+  fetchOtherUserPhone: (userId: number) => Promise<string | null>;
+  fetchPhoneByRelatedUserId: (relatedId: number, type: 'client' | 'partner') => Promise<string | null>;
   isAuthenticated: boolean;
 };
 
@@ -114,9 +116,69 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Nova função para buscar telefone de qualquer usuário (para WhatsApp)
+  const fetchPhoneByUserId = async (userId: number): Promise<string | null> => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/telefones/${userId}/`);
+      return response.data.numero;
+    } catch (error) {
+      console.log('Telefone não encontrado para o usuário ID:', userId);
+      return null;
+    }
+  };
+
+  // Nova função para buscar user_id do cliente a partir do client_id
+  const fetchClientUserId = async (clientId: number): Promise<number | null> => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/clientes/${clientId}/`);
+      return response.data.id_usuarios?.id || response.data.id_usuarios || null;
+    } catch (error) {
+      console.log('Erro ao buscar user_id do cliente:', error);
+      return null;
+    }
+  };
+
+  // Nova função para buscar user_id do parceiro a partir do partner_id
+  const fetchPartnerUserId = async (partnerId: number): Promise<number | null> => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/parceiros/${partnerId}/`);
+      return response.data.id_usuarios?.id || response.data.id_usuarios || null;
+    } catch (error) {
+      console.log('Erro ao buscar user_id do parceiro:', error);
+      return null;
+    }
+  };
+
+  // Nova função combinada para buscar telefone por client_id ou partner_id
+  const fetchPhoneByRelatedId = async (relatedId: number, type: 'client' | 'partner'): Promise<string | null> => {
+    try {
+      const userId = type === 'client' 
+        ? await fetchClientUserId(relatedId) 
+        : await fetchPartnerUserId(relatedId);
+      
+      if (userId) {
+        return await fetchPhoneByUserId(userId);
+      }
+      return null;
+    } catch (error) {
+      console.log(`Erro ao buscar telefone via ${type}_id:`, error);
+      return null;
+    }
+  };
+
   const fetchUserPhone = async (): Promise<string | null> => {
     if (!user) return null;
     return await fetchUserPhoneFromAPI(user.user_id);
+  };
+
+  // Nova função exportada para buscar telefone de outros usuários
+  const fetchOtherUserPhone = async (userId: number): Promise<string | null> => {
+    return await fetchPhoneByUserId(userId);
+  };
+
+  // Nova função exportada para buscar telefone por client_id ou partner_id
+  const fetchPhoneByRelatedUserId = async (relatedId: number, type: 'client' | 'partner'): Promise<string | null> => {
+    return await fetchPhoneByRelatedId(relatedId, type);
   };
 
   const updateUserPhone = async (phone: string): Promise<boolean> => {
@@ -271,7 +333,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <UserContext.Provider value={
-      { user, setUser, login, logout, updatePassword, updateProfileImage, clearProfileImage, fetchUserPhone, updateUserPhone, isAuthenticated }
+      { user, setUser, login, logout, updatePassword, updateProfileImage, clearProfileImage, fetchUserPhone, updateUserPhone, fetchOtherUserPhone, fetchPhoneByRelatedUserId, isAuthenticated }
       }>
       {children}
     </UserContext.Provider>

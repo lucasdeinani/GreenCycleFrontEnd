@@ -17,6 +17,7 @@ import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from '../context/UserContext';
 import axios from 'axios';
 import { useCallback } from 'react';
+import { fetchColetaDetalhes, ColetaDetalhes } from '../services/coletaService';
 
 // URL base da API
 import { API_BASE_URL } from '../configs'
@@ -32,6 +33,7 @@ interface ColetaCompleta {
   cliente_id: number;
   cliente_nome: string;
   parceiro_nome: string | null;
+  parceiro_id?: number; // ID do parceiro na tabela parceiros
   material_nome: string;
   peso_material: string;
   quantidade_material: string | null;
@@ -62,9 +64,11 @@ export default function HistoricoColetasScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [coletas, setColetas] = useState<ColetaCompleta[]>([]);
   const [selectedColeta, setSelectedColeta] = useState<ColetaCompleta | null>(null);
+  const [coletaDetalhes, setColetaDetalhes] = useState<ColetaDetalhes | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [userType, setUserType] = useState<'cliente' | 'parceiro' | null>(null);
+  const [buscandoDetalhes, setBuscandoDetalhes] = useState(false);
   
   // Determinar tipo de usuário baseado nas propriedades disponíveis
   useEffect(() => {
@@ -173,10 +177,25 @@ export default function HistoricoColetasScreen() {
     fetchColetas();
   };
 
-  const handleColetaPress = (coleta: ColetaCompleta) => {
+  const handleColetaPress = async (coleta: ColetaCompleta) => {
     if (!coleta) return;
+    
     setSelectedColeta(coleta);
     setModalVisible(true);
+    setColetaDetalhes(null);
+    
+    // Buscar detalhes completos da coleta
+    setBuscandoDetalhes(true);
+    try {
+      console.log(`Buscando detalhes da coleta ${coleta.id}`);
+      const detalhes = await fetchColetaDetalhes(coleta.id);
+      setColetaDetalhes(detalhes);
+    } catch (error) {
+      console.error('Erro ao buscar detalhes da coleta:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os detalhes da coleta.');
+    } finally {
+      setBuscandoDetalhes(false);
+    }
   };
 
   const handleCancelarColeta = async () => {
@@ -275,21 +294,57 @@ export default function HistoricoColetasScreen() {
     }
   };
 
-  // Iniciar conversa no WhatsApp com o parceiro
-  const iniciarConversaWhatsApp = (parceiroNome?: string) => {
-    // Simular telefone do parceiro (em produção viria da API)
-    const telefoneSimulado = "+5554" + Math.floor(Math.random() * 90000000 + 10000000);
+  // Iniciar conversa no WhatsApp - com código do Brasil (+55)
+  const iniciarConversaWhatsApp = (telefone?: string | null, nome?: string | null) => {
+    // Verificar se há telefone cadastrado
+    if (!telefone || telefone.trim() === '' || telefone === 'Telefone não cadastrado') {
+      const tipoContato = userType === 'cliente' ? 'parceiro' : 'cliente';
+      Alert.alert(
+        'Telefone não disponível', 
+        `Este ${tipoContato} ainda não cadastrou um telefone. Não é possível iniciar conversa no WhatsApp.`,
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
+    let telefoneParaUsar: string;
     
-    const mensagem = `Olá ${parceiroNome || 'parceiro'}! Sou o cliente da Green Cycle e gostaria de conversar sobre minha coleta.`;
-    const url = `whatsapp://send?phone=${telefoneSimulado}&text=${encodeURIComponent(mensagem)}`;
+    // Remove todos os caracteres não numéricos
+    const telefoneNumerico = telefone.replace(/\D/g, '');
+    
+    // Verificar se o telefone tem pelo menos 10 dígitos (DDD + número)
+    if (telefoneNumerico.length < 10) {
+      const tipoContato = userType === 'cliente' ? 'parceiro' : 'cliente';
+      Alert.alert(
+        'Telefone inválido', 
+        `O telefone cadastrado do ${tipoContato} parece estar incompleto.`,
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+    
+    // Se não começar com 55, adiciona o código do Brasil
+    if (!telefoneNumerico.startsWith('55')) {
+      telefoneParaUsar = '55' + telefoneNumerico;
+    } else {
+      telefoneParaUsar = telefoneNumerico;
+    }
+    
+    const tipoContato = userType === 'cliente' ? 'parceiro' : 'cliente';
+    const mensagem = userType === 'cliente' 
+      ? `Olá ${nome || 'parceiro'}! Sou o cliente da Green Cycle e gostaria de conversar sobre minha coleta.`
+      : `Olá ${nome || 'cliente'}! Sou o parceiro da Green Cycle e estou entrando em contato sobre sua coleta.`;
+    
+    const url = `whatsapp://send?phone=${telefoneParaUsar}&text=${encodeURIComponent(mensagem)}`;
+    
+    console.log(`📱 Abrindo WhatsApp para: +${telefoneParaUsar}`);
     
     Linking.canOpenURL(url)
       .then((supported) => {
         if (supported) {
           return Linking.openURL(url);
         } else {
-          // Tentar abrir no navegador como fallback
-          const webUrl = `https://wa.me/${telefoneSimulado.replace('+', '')}?text=${encodeURIComponent(mensagem)}`;
+          const webUrl = `https://wa.me/${telefoneParaUsar}?text=${encodeURIComponent(mensagem)}`;
           return Linking.openURL(webUrl);
         }
       })
@@ -367,6 +422,14 @@ export default function HistoricoColetasScreen() {
       }
     };
   }, [user?.user_id, userType]);
+
+  // Função para fechar modal e limpar estados
+  const handleCloseModal = () => {
+    setModalVisible(false);
+    setSelectedColeta(null);
+    setColetaDetalhes(null);
+    setBuscandoDetalhes(false);
+  };
 
   if (isLoading) {
     return (
@@ -539,7 +602,7 @@ export default function HistoricoColetasScreen() {
         visible={modalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={handleCloseModal}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -547,7 +610,7 @@ export default function HistoricoColetasScreen() {
               <Text style={styles.modalTitle}>Detalhes da Coleta</Text>
               <TouchableOpacity
                 style={styles.closeButton}
-                onPress={() => setModalVisible(false)}
+                onPress={handleCloseModal}
               >
                 <Feather name="x" size={24} color="#666666" />
               </TouchableOpacity>
@@ -612,24 +675,73 @@ export default function HistoricoColetasScreen() {
                   </Text>
                 </View>
 
-                {selectedColeta.parceiro_nome && userType === 'cliente' && (
+                {userType === 'cliente' && (selectedColeta?.parceiro_nome || buscandoDetalhes) && (
                   <View style={styles.modalSection}>
                     <Text style={styles.modalSectionTitle}>Parceiro</Text>
-                    <View style={styles.parceiroDetail}>
-                      <Feather name="user" size={24} color="#4CAF50" style={styles.parceiroIcon} />
-                      <View>
-                        <Text style={styles.parceiroNome}>{selectedColeta.parceiro_nome}</Text>
-                        <Text style={styles.parceiroDescricao}>Parceiro responsável pela coleta</Text>
+                    {buscandoDetalhes ? (
+                      <View style={styles.loadingDetalhes}>
+                        <ActivityIndicator size="large" color="#4CAF50" />
+                        <Text style={styles.loadingDetalhesText}>Carregando informações do parceiro...</Text>
                       </View>
-                    </View>
-                    
-                    <TouchableOpacity
-                      style={styles.whatsappButton}
-                      onPress={() => iniciarConversaWhatsApp(selectedColeta.parceiro_nome || undefined)}
-                    >
-                      <FontAwesome5 name="whatsapp" size={20} color="#FFFFFF" />
-                      <Text style={styles.whatsappButtonText}>Contatar pelo WhatsApp</Text>
-                    </TouchableOpacity>
+                    ) : coletaDetalhes ? (
+                      <>
+                        <View style={styles.parceiroDetail}>
+                          <Feather name="user" size={24} color="#4CAF50" style={styles.parceiroIcon} />
+                          <View>
+                            <Text style={styles.parceiroNome}>{coletaDetalhes.parceiro_nome || 'Nome não disponível'}</Text>
+                            <Text style={styles.parceiroDescricao}>Parceiro responsável pela coleta</Text>
+                            <Text style={styles.parceiroTelefone}>
+                              {coletaDetalhes.parceiro_telefone || 'Telefone não cadastrado'}
+                            </Text>
+                          </View>
+                        </View>
+                        
+                        <TouchableOpacity
+                          style={styles.whatsappButton}
+                          onPress={() => iniciarConversaWhatsApp(coletaDetalhes.parceiro_telefone, coletaDetalhes.parceiro_nome)}
+                        >
+                          <FontAwesome5 name="whatsapp" size={20} color="#FFFFFF" />
+                          <Text style={styles.whatsappButtonText}>Contatar pelo WhatsApp</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <Text style={styles.erroDetalhes}>Não foi possível carregar as informações do parceiro.</Text>
+                    )}
+                  </View>
+                )}
+
+                {userType === 'parceiro' && (selectedColeta?.cliente_nome || buscandoDetalhes) && (
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>Cliente</Text>
+                    {buscandoDetalhes ? (
+                      <View style={styles.loadingDetalhes}>
+                        <ActivityIndicator size="large" color="#4CAF50" />
+                        <Text style={styles.loadingDetalhesText}>Carregando informações do cliente...</Text>
+                      </View>
+                    ) : coletaDetalhes ? (
+                      <>
+                        <View style={styles.clienteDetail}>
+                          <Feather name="user" size={24} color="#4CAF50" style={styles.clienteIcon} />
+                          <View>
+                            <Text style={styles.clienteNome}>{coletaDetalhes.cliente_nome || 'Nome não disponível'}</Text>
+                            <Text style={styles.clienteDescricao}>Cliente da coleta</Text>
+                            <Text style={styles.parceiroTelefone}>
+                              {coletaDetalhes.cliente_telefone || 'Telefone não cadastrado'}
+                            </Text>
+                          </View>
+                        </View>
+                        
+                        <TouchableOpacity
+                          style={styles.whatsappButton}
+                          onPress={() => iniciarConversaWhatsApp(coletaDetalhes.cliente_telefone, coletaDetalhes.cliente_nome)}
+                        >
+                          <FontAwesome5 name="whatsapp" size={20} color="#FFFFFF" />
+                          <Text style={styles.whatsappButtonText}>Contatar pelo WhatsApp</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <Text style={styles.erroDetalhes}>Não foi possível carregar as informações do cliente.</Text>
+                    )}
                   </View>
                 )}
                 
@@ -768,23 +880,7 @@ export default function HistoricoColetasScreen() {
                       );
                     }
                   }
-                  
-                  // Informações para parceiros
-                  if (userType === 'parceiro') {
-                    return (
-                      <View style={styles.parceiroModalInfo}>
-                        <Text style={styles.parceiroModalInfoText}>
-                          Status: {STATUS_MAP[selectedColeta.status_solicitacao as keyof typeof STATUS_MAP]?.label || selectedColeta.status_solicitacao}
-                        </Text>
-                        {statusNormalizado === "coletado" && (
-                          <Text style={styles.parceiroModalInfoText}>
-                            Aguardando cliente finalizar a coleta
-                          </Text>
-                        )}
-                      </View>
-                    );
-                  }
-                  
+                
                   // Status desconhecido
                   return (
                     <View style={styles.statusModalDestaque}>
@@ -1294,6 +1390,12 @@ const styles = StyleSheet.create({
     color: '#666666',
     marginTop: 2,
   },
+
+  parceiroTelefone: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#333333',
+  },
   whatsappButton: {
     backgroundColor: '#25D366',
     flexDirection: 'row',
@@ -1307,5 +1409,42 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontFamily: 'Roboto-Medium',
+  },
+  clienteDetail: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  clienteIcon: {
+    marginRight: 16,
+  },
+  clienteNome: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Medium',
+    color: '#333333',
+  },
+  clienteDescricao: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#666666',
+    marginTop: 2,
+  },
+  loadingDetalhes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  loadingDetalhesText: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontFamily: 'Roboto-Regular',
+    color: '#666666',
+  },
+  erroDetalhes: {
+    color: '#F44336',
+    fontSize: 16,
+    fontFamily: 'Roboto-Regular',
+    textAlign: 'center',
   },
 });

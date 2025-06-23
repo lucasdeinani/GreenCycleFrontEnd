@@ -49,27 +49,7 @@ export default function ProfileScreen() {
   };
 
   const handlePhoneChange = (value: string) => {
-    // Remove caracteres não numéricos e limita a 11 dígitos
-    const cleaned = value.replace(/\D/g, '').slice(0, 11);
-    
-    let formattedPhone = '';
-    
-    if (cleaned.length === 0) {
-        formattedPhone = '';
-    } else if (cleaned.length === 1) {
-        formattedPhone = `(${cleaned}`;
-    } else if (cleaned.length === 2) {
-        formattedPhone = `(${cleaned})`;
-    } else if (cleaned.length <= 6) {
-        formattedPhone = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
-    } else if (cleaned.length <= 10) {
-        // Telefone fixo: (XX) XXXX-XXXX
-        formattedPhone = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
-    } else if (cleaned.length === 11) {
-        // Celular: (XX) XXXXX-XXXX
-        formattedPhone = `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
-    }
-    
+    const formattedPhone = formatPhone(value);
     handleChange('phone', formattedPhone);
   };
 

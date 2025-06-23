@@ -17,6 +17,7 @@ import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useUser } from '../context/UserContext';
 import axios from 'axios';
 import { useCallback } from 'react';
+import { fetchColetaDetalhes, ColetaDetalhes } from '../services/coletaService';
 
 // URL base da API
 import { API_BASE_URL } from '../configs'
@@ -71,8 +72,10 @@ export default function DashboardPedidosScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [pedidos, setPedidos] = useState<ColetaParceiro[]>([]);
   const [selectedPedido, setSelectedPedido] = useState<ColetaParceiro | null>(null);
+  const [coletaDetalhes, setColetaDetalhes] = useState<ColetaDetalhes | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [atualizandoStatus, setAtualizandoStatus] = useState(false);
+  const [buscandoDetalhes, setBuscandoDetalhes] = useState(false);
   const [estatisticas, setEstatisticas] = useState({
     emAndamento: 0,
     aceitos: 0,
@@ -218,59 +221,80 @@ export default function DashboardPedidosScreen() {
     }
   };
   
-  const handleMarcarColetado = async () => {
-    if (!selectedPedido?.id) return;
+  const handlePedidoPress = async (pedido: ColetaParceiro) => {
+    if (!pedido) return;
     
-    setAtualizandoStatus(true);
+    setSelectedPedido(pedido);
+    setModalVisible(true);
+    setColetaDetalhes(null);
     
+    // Buscar detalhes completos da coleta
+    setBuscandoDetalhes(true);
     try {
-      // Usar o novo endpoint de marcar como coletado
-      await axios.post(`${API_BASE_URL}/coletas/${selectedPedido.id}/marcar-coletado/`);
-      
-      // Atualizar a lista local
-      setPedidos(pedidos.map(pedido => {
-        if (pedido.id === selectedPedido.id) {
-          return {
-            ...pedido,
-            status_solicitacao: "coletado"
-          };
-        }
-        return pedido;
-      }));
-      
-      // Atualizar o pedido selecionado no modal
-      setSelectedPedido({
-        ...selectedPedido,
-        status_solicitacao: "coletado"
-      });
-      
-      // Atualizar estatísticas
-      fetchPedidos();
-      
-      Alert.alert('Sucesso', 'Coleta marcada como realizada! Aguarde o cliente finalizar o processo.');
-      
-    } catch (error: any) {
-      console.error('Erro ao marcar como coletado:', error.response?.data || error.message);
-      Alert.alert('Erro', 'Não foi possível atualizar o status. Tente novamente.');
+      console.log(`Buscando detalhes da coleta ${pedido.id}`);
+      const detalhes = await fetchColetaDetalhes(pedido.id);
+      setColetaDetalhes(detalhes);
+    } catch (error) {
+      console.error('Erro ao buscar detalhes da coleta:', error);
+      Alert.alert('Erro', 'Não foi possível carregar os detalhes da coleta.');
     } finally {
-      setAtualizandoStatus(false);
+      setBuscandoDetalhes(false);
     }
   };
   
-  // Iniciar conversa no WhatsApp
-  const iniciarConversaWhatsApp = (telefone?: string) => {
-    const telefoneSimulado = telefone || "+5554" + Math.floor(Math.random() * 90000000 + 10000000);
+  // Função para fechar modal e limpar estados
+  const handleCloseModal = () => {
+    setModalVisible(false);
+    setSelectedPedido(null);
+    setColetaDetalhes(null);
+    setBuscandoDetalhes(false);
+  };
+  
+  // Iniciar conversa no WhatsApp - com código do Brasil (+55)
+  const iniciarConversaWhatsApp = (telefone?: string | null, clienteNome?: string) => {
+    // Verificar se há telefone cadastrado
+    if (!telefone || telefone.trim() === '' || telefone === 'Telefone não cadastrado') {
+      Alert.alert(
+        'Telefone não disponível', 
+        'Este cliente ainda não cadastrou um telefone. Não é possível iniciar conversa no WhatsApp.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
+    let telefoneParaUsar: string;
     
-    const mensagem = `Olá! Sou o parceiro de coleta da Green Cycle e estou entrando em contato sobre sua solicitação de coleta.`;
-    const url = `whatsapp://send?phone=${telefoneSimulado}&text=${encodeURIComponent(mensagem)}`;
+    // Remove todos os caracteres não numéricos
+    const telefoneNumerico = telefone.replace(/\D/g, '');
+    
+    // Verificar se o telefone tem pelo menos 10 dígitos (DDD + número)
+    if (telefoneNumerico.length < 10) {
+      Alert.alert(
+        'Telefone inválido', 
+        'O telefone cadastrado parece estar incompleto. Verifique com o cliente.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+    
+    // Se não começar com 55, adiciona o código do Brasil
+    if (!telefoneNumerico.startsWith('55')) {
+      telefoneParaUsar = '55' + telefoneNumerico;
+    } else {
+      telefoneParaUsar = telefoneNumerico;
+    }
+    
+    const mensagem = `Olá ${clienteNome || 'cliente'}! Sou o parceiro de coleta da Green Cycle e estou entrando em contato sobre sua solicitação de coleta.`;
+    const url = `whatsapp://send?phone=${telefoneParaUsar}&text=${encodeURIComponent(mensagem)}`;
+    
+    console.log(`📱 Abrindo WhatsApp para: +${telefoneParaUsar}`);
     
     Linking.canOpenURL(url)
       .then((supported) => {
         if (supported) {
           return Linking.openURL(url);
         } else {
-          // Tentar abrir no navegador como fallback
-          const webUrl = `https://wa.me/${telefoneSimulado.replace('+', '')}?text=${encodeURIComponent(mensagem)}`;
+          const webUrl = `https://wa.me/${telefoneParaUsar}?text=${encodeURIComponent(mensagem)}`;
           return Linking.openURL(webUrl);
         }
       })
@@ -278,12 +302,6 @@ export default function DashboardPedidosScreen() {
         console.error('Erro ao abrir WhatsApp:', err);
         Alert.alert('Erro', 'Não foi possível abrir o WhatsApp. Verifique se o aplicativo está instalado.');
       });
-  };
-  
-  const handlePedidoPress = (pedido: ColetaParceiro) => {
-    if (!pedido) return;
-    setSelectedPedido(pedido);
-    setModalVisible(true);
   };
   
   const getStatusInfo = (statusCode: string) => {
@@ -327,6 +345,24 @@ export default function DashboardPedidosScreen() {
       </TouchableOpacity>
     </View>
   );
+  
+  // Função para marcar como coletado
+  const handleMarcarColetado = async () => {
+    if (!selectedPedido?.id) return;
+    
+    setAtualizandoStatus(true);
+    
+    try {
+      await axios.post(`${API_BASE_URL}/coletas/${selectedPedido.id}/marcar-coletado/`);
+      await fetchPedidos(); // Recarregar dados
+      Alert.alert('Sucesso', 'Coleta marcada como realizada! Aguarde o cliente finalizar o processo.');
+    } catch (error: any) {
+      console.error('Erro ao marcar como coletado:', error);
+      Alert.alert('Erro', 'Não foi possível atualizar o status. Tente novamente.');
+    } finally {
+      setAtualizandoStatus(false);
+    }
+  };
   
   if (isLoading) {
     return (
@@ -455,31 +491,7 @@ export default function DashboardPedidosScreen() {
                   {pedido.status_solicitacao === "aceitado" && (
                     <TouchableOpacity 
                       style={styles.coletarButton}
-                      onPress={() => {
-                        Alert.alert(
-                          'Marcar como Coletado',
-                          'Confirma que você realizou a coleta deste material?',
-                          [
-                            { text: 'Cancelar', style: 'cancel' },
-                            { 
-                              text: 'Confirmar', 
-                              onPress: async () => {
-                                setAtualizandoStatus(true);
-                                try {
-                                  await axios.post(`${API_BASE_URL}/coletas/${pedido.id}/marcar-coletado/`);
-                                  await fetchPedidos(); // Recarregar dados
-                                  Alert.alert('Sucesso', 'Coleta marcada como realizada! Aguarde o cliente finalizar o processo.');
-                                } catch (error: any) {
-                                  console.error('Erro ao marcar como coletado:', error);
-                                  Alert.alert('Erro', 'Não foi possível atualizar o status. Tente novamente.');
-                                } finally {
-                                  setAtualizandoStatus(false);
-                                }
-                              }
-                            }
-                          ]
-                        );
-                      }}
+                      onPress={handleMarcarColetado}
                       disabled={atualizandoStatus}
                     >
                       {atualizandoStatus ? (
@@ -523,7 +535,7 @@ export default function DashboardPedidosScreen() {
         visible={modalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={handleCloseModal}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -531,7 +543,7 @@ export default function DashboardPedidosScreen() {
               <Text style={styles.modalTitle}>Detalhes da Coleta #{selectedPedido?.id}</Text>
               <TouchableOpacity
                 style={styles.closeButton}
-                onPress={() => setModalVisible(false)}
+                onPress={handleCloseModal}
               >
                 <Feather name="x" size={24} color="#666666" />
               </TouchableOpacity>
@@ -679,26 +691,35 @@ export default function DashboardPedidosScreen() {
                 
                 <View style={styles.modalSection}>
                   <Text style={styles.modalSectionTitle}>Cliente</Text>
-                  <View style={styles.clienteDetail}>
-                    <Feather name="user" size={24} color="#4CAF50" style={styles.clienteIcon} />
-                    <View>
-                      <Text style={styles.clienteNome}>{selectedPedido.cliente_nome || 'Nome não disponível'}</Text>
-                      {selectedPedido.cliente_email && (
-                        <Text style={styles.clienteEmail}>{selectedPedido.cliente_email}</Text>
-                      )}
-                      <Text style={styles.clienteTelefone}>
-                        {selectedPedido.cliente_telefone || `+5554${Math.floor(Math.random() * 90000000 + 10000000)}`}
-                      </Text>
+                  {buscandoDetalhes ? (
+                    <View style={styles.loadingDetalhes}>
+                      <ActivityIndicator size="large" color="#4CAF50" />
+                      <Text style={styles.loadingDetalhesText}>Carregando informações do cliente...</Text>
                     </View>
-                  </View>
-                  
-                  <TouchableOpacity
-                    style={styles.whatsappButton}
-                    onPress={() => iniciarConversaWhatsApp(selectedPedido.cliente_telefone)}
-                  >
-                    <FontAwesome5 name="whatsapp" size={20} color="#FFFFFF" />
-                    <Text style={styles.whatsappButtonText}>Contatar pelo WhatsApp</Text>
-                  </TouchableOpacity>
+                  ) : coletaDetalhes ? (
+                    <>
+                      <View style={styles.clienteDetail}>
+                        <Feather name="user" size={24} color="#4CAF50" style={styles.clienteIcon} />
+                        <View>
+                          <Text style={styles.clienteNome}>{coletaDetalhes.cliente_nome || 'Nome não disponível'}</Text>
+                          <Text style={styles.clienteDescricao}>Cliente da coleta</Text>
+                          <Text style={styles.clienteTelefone}>
+                            {coletaDetalhes.cliente_telefone || 'Telefone não cadastrado'}
+                          </Text>
+                        </View>
+                      </View>
+                      
+                      <TouchableOpacity
+                        style={styles.whatsappButton}
+                        onPress={() => iniciarConversaWhatsApp(coletaDetalhes.cliente_telefone, coletaDetalhes.cliente_nome)}
+                      >
+                        <FontAwesome5 name="whatsapp" size={20} color="#FFFFFF" />
+                        <Text style={styles.whatsappButtonText}>Contatar pelo WhatsApp</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <Text style={styles.erroDetalhes}>Não foi possível carregar as informações do cliente.</Text>
+                  )}
                 </View>
                 
                 <View style={styles.modalSection}>
@@ -1088,7 +1109,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Medium',
     color: '#333333',
   },
-  clienteEmail: {
+  clienteDescricao: {
     fontSize: 14,
     fontFamily: 'Roboto-Regular',
     color: '#666666',
@@ -1098,7 +1119,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Roboto-Regular',
     color: '#666666',
-    marginTop: 2,
   },
   whatsappButton: {
     backgroundColor: '#25D366',
@@ -1340,6 +1360,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Roboto-Bold',
     marginLeft: 10,
+    textAlign: 'center',
+  },
+  loadingDetalhes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  loadingDetalhesText: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Regular',
+    color: '#666666',
+    marginLeft: 8,
+  },
+  erroDetalhes: {
+    color: '#F44336',
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
     textAlign: 'center',
   },
  });

@@ -58,66 +58,16 @@ export default function AceitarSolicitacoesScreen() {
   const fetchSolicitacoes = async () => {
     try {
       if (!user?.user_id) {
-        console.warn('❌ ID do usuário não encontrado');
+        console.warn('ID do usuário não encontrado');
         setIsLoading(false);
         return;
       }
       
-      if (!user?.partner_id) {
-        console.warn('⚠️ Partner ID não encontrado. Usuário pode não ser parceiro.');
-        console.log('👤 Tipo do usuário:', user.tipo);
-        console.log('🆔 User ID:', user.user_id);
-        console.log('🏢 Partner ID:', user.partner_id);
-      }
-      
-      console.log('🔍 Buscando solicitações pendentes para parceiro:', user.user_id);
-      console.log('👤 Dados do usuário completos:', user);
-      
-      // Tentar primeiro com partner_id se disponível, senão usar user_id
-      let parceiroId = user.partner_id || user.user_id;
-      let urlTentativa = `${API_BASE_URL}/coletas/pendentes-parceiro/${parceiroId}/`;
-      
-      console.log('🔗 URL da requisição (primeira tentativa):', urlTentativa);
-      console.log('🆔 Usando ID:', parceiroId, '(tipo:', user.partner_id ? 'partner_id' : 'user_id', ')');
-      
-      let response;
-      try {
-        // Primeira tentativa
-        response = await axios.get(urlTentativa);
-        console.log('✅ Sucesso na primeira tentativa');
-      } catch (firstError: any) {
-        console.log('❌ Primeira tentativa falhou:', firstError.response?.status, firstError.response?.data);
-        
-        // Se falhou e usamos partner_id, tentar com user_id
-        if (user.partner_id && user.user_id !== user.partner_id) {
-          console.log('🔄 Tentando com user_id...');
-          urlTentativa = `${API_BASE_URL}/coletas/pendentes-parceiro/${user.user_id}/`;
-          console.log('🔗 URL da segunda tentativa:', urlTentativa);
-          
-          try {
-            response = await axios.get(urlTentativa);
-            console.log('✅ Sucesso na segunda tentativa');
-          } catch (secondError) {
-            console.log('❌ Segunda tentativa também falhou');
-            throw secondError;
-          }
-        } else {
-          throw firstError;
-        }
-      }
-      
-      console.log('📡 Status da resposta:', response.status);
-      console.log('📦 Headers da resposta:', response.headers);
-      console.log('🔍 Tipo dos dados recebidos:', typeof response.data);
-      console.log('📊 É array?', Array.isArray(response.data));
-      
-      console.log('📋 Solicitações recebidas:', response.data);
-      console.log('📊 Quantidade de solicitações recebidas:', response.data.length);
+      // Usar o endpoint da API
+      const response = await axios.get(`${API_BASE_URL}/coletas/pendentes-parceiro/${user.user_id}/`);
       
       // Filtrar e validar dados antes de processar
       const solicitacoesValidas = response.data.filter((item: any) => {
-        console.log('🔍 Verificando item:', item);
-        
         const hasItem = !!item;
         const hasId = !!(item?.id && item.id !== null && item.id !== undefined);
         const hasMaterial = !!(item?.material_nome && item.material_nome.trim() !== '');
@@ -127,42 +77,7 @@ export default function AceitarSolicitacoesScreen() {
         // O cliente pode informar peso OU quantidade, não necessariamente ambos
         const hasPesoOuQuantidade = hasPeso || hasQuantidade;
         
-        console.log('📋 Validação detalhada:', {
-          hasItem,
-          hasId,
-          hasMaterial,
-          hasPeso,
-          hasQuantidade,
-          hasPesoOuQuantidade,
-          id: item?.id,
-          material_nome: item?.material_nome,
-          peso_material: item?.peso_material,
-          quantidade_material: item?.quantidade_material,
-          tipoId: typeof item?.id,
-          tipoMaterial: typeof item?.material_nome,
-          tipoPeso: typeof item?.peso_material,
-          tipoQuantidade: typeof item?.quantidade_material
-        });
-        
-        const isValid = hasItem && hasId && hasMaterial && hasPesoOuQuantidade;
-        
-        if (!isValid) {
-          console.log('❌ Solicitação inválida filtrada:', {
-            item,
-            motivo: {
-              semItem: !hasItem,
-              semId: !hasId,
-              semMaterial: !hasMaterial,
-              semPeso: !hasPeso,
-              semQuantidade: !hasQuantidade,
-              semPesoOuQuantidade: !hasPesoOuQuantidade
-            }
-          });
-        } else {
-          console.log('✅ Solicitação válida:', item.id);
-        }
-        
-        return isValid;
+        return hasItem && hasId && hasMaterial && hasPesoOuQuantidade;
       }).map((item: any) => ({
         ...item,
         peso_material: item.peso_material || '0',
@@ -172,9 +87,6 @@ export default function AceitarSolicitacoesScreen() {
         cliente_nome: item.cliente_nome || 'Nome não disponível',
         endereco_completo: item.endereco_completo || 'Endereço não disponível'
       }));
-      
-      console.log('✅ Solicitações válidas após filtro:', solicitacoesValidas.length);
-      console.log('📝 Primeiras 3 solicitações válidas:', solicitacoesValidas.slice(0, 3));
       
       // Ordenar por distância (mais próximas primeiro) e depois por data
       const solicitacoesOrdenadas = solicitacoesValidas.sort((a: ColetaPendente, b: ColetaPendente) => {
@@ -191,9 +103,7 @@ export default function AceitarSolicitacoesScreen() {
         return dataB.getTime() - dataA.getTime();
       });
       
-      console.log('🔄 Solicitações ordenadas:', solicitacoesOrdenadas.length);
       setSolicitacoes(solicitacoesOrdenadas);
-      console.log('💾 Estado atualizado com', solicitacoesOrdenadas.length, 'solicitações');
       
     } catch (error: any) {
       console.error('Erro ao buscar solicitações:', error.response?.data || error.message);
@@ -400,11 +310,7 @@ export default function AceitarSolicitacoesScreen() {
       </View>
       
       <View style={styles.content}>
-        {(() => {
-          console.log('🖥️ Renderizando tela com', solicitacoes.length, 'solicitações');
-          console.log('📱 Estado atual das solicitações:', solicitacoes);
-          return null;
-        })()}
+
         {solicitacoes.length === 0 ? (
           renderEmptyList()
         ) : (

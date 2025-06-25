@@ -65,6 +65,22 @@ export default function MenuParceiroScreen() {
 
           <TouchableOpacity
             style={styles.menuButton}
+            onPress={() => router.push('/avaliacoes_parceiro')}
+          >
+            <Feather name="star" size={24} color="#FFFFFF" />
+            <Text style={styles.menuButtonText}>Avaliações</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => router.push('/dashboardParceiro')}
+          >
+            <Feather name="truck" size={24} color="#FFFFFF" />
+            <Text style={styles.menuButtonText}>Dashboard</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuButton}
             onPress={handleLogout}
           >
             <Feather name="log-out" size={24} color="#FFFFFF" />

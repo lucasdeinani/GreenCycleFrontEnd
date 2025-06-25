@@ -65,6 +65,14 @@ export default function MenuScreen() {
 
           <TouchableOpacity
             style={styles.menuButton}
+            onPress={() => router.push('/avaliacoes_cliente')}
+          >
+            <Feather name="star" size={24} color="#FFFFFF" />
+            <Text style={styles.menuButtonText}>Avaliações</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuButton}
             onPress={handleLogout}
           >
             <Feather name="log-out" size={24} color="#FFFFFF" />

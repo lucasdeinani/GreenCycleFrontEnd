@@ -252,7 +252,7 @@ export default function HistoricoColetasScreen() {
     if (!selectedColeta) return;
     
     // Verificar se a coleta pode ser finalizada (coletado)
-    if (selectedColeta.status_solicitacao !== "coletado") {
+    if (selectedColeta.status_solicitacao !== "Coletado") {
       Alert.alert(
         'Não é possível finalizar', 
         'Apenas coletas já coletadas podem ser finalizadas.'
@@ -260,7 +260,7 @@ export default function HistoricoColetasScreen() {
       return;
     }
     
-    if (selectedColeta.status_pagamento !== "pendente") {
+    if (selectedColeta.status_pagamento !== "Pendente") {
       Alert.alert(
         'Não é possível finalizar', 
         'Apenas coletas com pagamento pendente podem ser finalizadas.'

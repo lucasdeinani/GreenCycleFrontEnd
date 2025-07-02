@@ -73,10 +73,10 @@ export default function MenuParceiroScreen() {
 
           <TouchableOpacity
             style={styles.menuButton}
-            onPress={() => router.push('/dashboardParceiro')}
+            onPress={() => router.push('/convidar_amigos')}
           >
-            <Feather name="truck" size={24} color="#FFFFFF" />
-            <Text style={styles.menuButtonText}>Dashboard</Text>
+            <Feather name="user-plus" size={24} color="#FFFFFF" />
+            <Text style={styles.menuButtonText}>Convidar Amigos</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

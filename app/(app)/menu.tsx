@@ -73,6 +73,14 @@ export default function MenuScreen() {
 
           <TouchableOpacity
             style={styles.menuButton}
+            onPress={() => router.push('/convidar_amigos')}
+          >
+            <Feather name="user-plus" size={24} color="#FFFFFF" />
+            <Text style={styles.menuButtonText}>Convidar Amigos</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuButton}
             onPress={handleLogout}
           >
             <Feather name="log-out" size={24} color="#FFFFFF" />

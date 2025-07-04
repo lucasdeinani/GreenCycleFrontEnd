@@ -1,0 +1,26 @@
+{
+  "name": "greencycle-email-backend",
+  "version": "1.0.0",
+  "description": "Backend para envio de emails do GreenCycle",
+  "main": "EXEMPLO_BACKEND_EMAIL.js",
+  "scripts": {
+    "start": "node EXEMPLO_BACKEND_EMAIL.js",
+    "dev": "nodemon EXEMPLO_BACKEND_EMAIL.js",
+    "test": "node -e \"console.log('Testando servidor...'); require('./EXEMPLO_BACKEND_EMAIL.js')\""
+  },
+  "keywords": ["greencycle", "email", "backend", "nodejs", "express"],
+  "author": "GreenCycle Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "nodemailer": "^6.9.7",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+} 

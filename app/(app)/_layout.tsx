@@ -21,6 +21,7 @@ export default function AppLayout() {
       <Stack.Screen name="historicRequest" />
       <Stack.Screen name="request" />
       <Stack.Screen name="password_reset_modal" />
+      <Stack.Screen name="ajuda" />
     </Stack>
   );
 }

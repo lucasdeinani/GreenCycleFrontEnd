@@ -34,6 +34,7 @@ export default function AvaliacoesParceiroScreen() {
   const [comentario, setComentario] = useState('');
   const [salvandoAvaliacao, setSalvandoAvaliacao] = useState(false);
   const [carregandoPerfilCliente, setCarregandoPerfilCliente] = useState<number | null>(null);
+  const [carregandoEstatisticas, setCarregandoEstatisticas] = useState(false);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -141,7 +142,10 @@ export default function AvaliacoesParceiroScreen() {
       return;
     }
 
+    if (carregandoEstatisticas) return; // Evita múltiplos cliques
+
     try {
+      setCarregandoEstatisticas(true);
       console.log(`📊 [AvaliacoesParceiro] Carregando estatísticas do parceiro ${user.user_id}`);
       const stats = await AvaliacaoService.buscarEstatisticasParceiro(user.user_id);
       console.log('✅ [AvaliacoesParceiro] Estatísticas carregadas:', stats);
@@ -150,6 +154,8 @@ export default function AvaliacoesParceiroScreen() {
     } catch (error) {
       console.error('❌ [AvaliacoesParceiro] Erro ao carregar estatísticas do parceiro:', error);
       Alert.alert('Erro', 'Não foi possível carregar suas estatísticas. Verifique se há dados de avaliação.');
+    } finally {
+      setCarregandoEstatisticas(false);
     }
   };
 
@@ -275,11 +281,18 @@ export default function AvaliacoesParceiroScreen() {
       </View>
 
       <TouchableOpacity
-        style={styles.estatisticasButton}
+        style={[styles.estatisticasButton, carregandoEstatisticas && styles.estatisticasButtonLoading]}
         onPress={carregarEstatisticasParceiro}
+        disabled={carregandoEstatisticas}
       >
-        <Feather name="bar-chart-2" size={20} color="#FFFFFF" />
-        <Text style={styles.estatisticasButtonText}>Ver Minhas Estatísticas</Text>
+        {carregandoEstatisticas ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <Feather name="bar-chart-2" size={20} color="#FFFFFF" />
+        )}
+        <Text style={styles.estatisticasButtonText}>
+          {carregandoEstatisticas ? 'Carregando...' : 'Ver Minhas Estatísticas'}
+        </Text>
       </TouchableOpacity>
 
       {/* Avaliações Pendentes */}
@@ -521,6 +534,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  estatisticasButtonLoading: {
+    opacity: 0.6,
   },
   section: {
     marginBottom: 32,
